@@ -5,8 +5,8 @@ import random
 from sklearn.model_selection import KFold
 from tqdm import tqdm, trange
 
-from csa.make_matrix import mkmat_cs, mkmat_cs_w
-from csa.fista import fista
+from make_matrix import mkmat_cs, mkmat_cs_w
+from fista import fista
 
 def _get_frecvec(freqinfo):
     freq_edge = np.linspace(freqinfo[0],
