@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 from scipy import signal
 import random
 from sklearn.model_selection import KFold
@@ -7,6 +8,8 @@ from tqdm import tqdm, trange
 
 from make_matrix import mkmat_cs, mkmat_cs_w
 from fista.fista import fista
+from window_function import Window
+from summary_handler.summary_handler import SummaryNew
 
 def _get_frecvec(freqinfo):
     freq_edge = np.linspace(freqinfo[0],
@@ -19,6 +22,17 @@ def _complement_index(ind):
     comp = np.ones(len(ind), dtype=bool)
     comp[ind] = False
     return comp
+
+def _query_lightcurve(data, limit):
+    data_out = data[np.where((limit[0] <= data[:,0]) & (data[:,0] < limit[1]))]
+    return data_out
+
+def _drop_sample(data, rate, seed=0):
+    n_data = data.shape[0]
+    n_drop = int(n_data * rate)
+    index_drop = np.random.choice(n_data - 1, n_drop, replace=False)
+    data_del = np.delete(data, index_drop, 0)
+    return data_del
 
 def cs(infile1, infile2, freqinfo, lam):
 
@@ -77,7 +91,7 @@ def cv(infile1, infile2, freqinfo, lambdainfo, nfold):
             data2_te = data2[index_te2]
 
             # calcurate rms
-            x_tr = fista(data1_tr, data2_tr, freqinfo, lam)
+            freq, x_tr = fista(data1_tr, data2_tr, freqinfo, lam)
             A_mat_te = mkmat_cs(data1_te[:,0], data2_te[:,0], freqdata)
             y_te = np.dot(A_mat_te, x_tr)
             data_te = np.hstack([data1_te[:,1], data2_te[:,1]])
@@ -94,7 +108,8 @@ def cv(infile1, infile2, freqinfo, lambdainfo, nfold):
     return cvdata
 
 
-def stcs(infile1, infile2, freqinfo, lam, t_perseg, t_overlap, window='hann', x_name='x_stcs.dat'):
+def stcs(infile1, infile2, freqinfo, lam, t_perseg, t_overlap,
+         window='hann', x_name='x_stcs.dat'):
 
     # load infile
     data1 = np.loadtxt(infile1)
@@ -115,28 +130,50 @@ def stcs(infile1, infile2, freqinfo, lam, t_perseg, t_overlap, window='hann', x_
     t_st = data1[0,0] if data1[0,0] >= data2[0,0] else data2[0,0]
     t_en = t_st + t_perseg
     t_en_limit = data1[-1, 0] if data1[-1, 0] <= data2[-1, 0] else data2[-1, 0]
-    x_series = []
     iteration = int((t_en_limit - t_en) / t_overlap)
 
+    x_series = []
+    t_series = []
     for i in trange(iteration):
         # set time range
         t_st_q = t_st + i * t_overlap
         t_en_q = t_en + i * t_overlap
 
         # divide
-        data1_seg = data1[np.where((t_st_q <= data1[:,0]) & (data1[:,0] < t_en_q), True, False)]
-        data2_seg = data2[np.where((t_st_q <= data2[:,0]) & (data2[:,0] < t_en_q), True, False)]
-        data1_seg[:,1] = data1_seg[:,1] * signal.get_window(window, data1_seg.shape[0])
-        data2_seg[:,1] = data2_seg[:,1] * signal.get_window(window, data2_seg.shape[0])
+        data1_seg = _query_lightcurve(data1, [t_st_q, t_en_q])
+        data2_seg = _query_lightcurve(data1, [t_st_q, t_en_q])
+        data1_seg[:,1] = data1_seg[:,1] \
+                       * signal.get_window(window, data1_seg.shape[0])
+        data2_seg[:,1] = data2_seg[:,1] \
+                       * signal.get_window(window, data2_seg.shape[0])
+
+        # drop rows
+        rate_drop = 0.1
+        data1_seg_del = _drop_sample(data1_seg, rate_drop, seed=11)
+        data2_seg_del = _drop_sample(data2_seg, rate_drop, seed=12)
 
         # estimate
-        x_seg = fista(data1_seg, data2_seg, freqinfo, lam)
+        freq, x_seg = fista(data1_seg, data2_seg, freqinfo, lam)
         x_series.append(x_seg)
+        t_series.append((t_st_q + t_en_q) * 0.5)
 
     print('finish stcs')
-    x_data = np.array(x_series)
-    np.savetxt(x_name, x_data)
-    return x_data
+    Zxx = np.array(x_series)
+    t_data = np.array(t_series)
+    np.savetxt(x_name, Zxx)
+    return freq, t_data, Zxx
+
+
+def istcs(X, freqinfo, t1, t2, tsegment, toverlap):
+    '''
+    T: ndarray
+        The series of start time of each segment
+    '''
+    x = X[0]
+    summ = SummaryNew(x, freqinfo)
+    y1, y2 = summ.pred(t1)
+    print(y1.shape)
+    return y1, y2
 
 if __name__ == '__main__':
     infile1 = 'lc1.dat'
@@ -145,7 +182,6 @@ if __name__ == '__main__':
     lambdainfo = [1e-1, 1e2, 20]
     cvdata = cv(infile1, infile2, freqinfo, lambdainfo, 5)
 
-    import matplotlib.pyplot as plt
     plt.errorbar(cvdata[:,0], cvdata[:,1], cvdata[:,2], fmt='o')
     plt.xscale('log')
     plt.xlabel(r'$\lambda$')
@@ -154,5 +190,6 @@ if __name__ == '__main__':
 
     x_data = stcs('./lc1.dat', './lc2.dat', [0, 0.5, 20], 1e-1, 10, 1)
     np.savetxt('x_sample.dat', x_data)
-    # x_data = stcs('./gx339_x_fir_original.dat', './gx339_o_fir_original.dat', [0,10,2000], 20, 50, 1)
+    # x_data = stcs('./gx339_x_fir_original.dat', './gx339_o_fir_original.dat',
+    #               [0,10,2000], 20, 50, 1)
     print(x_data.shape)

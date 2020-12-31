@@ -1,0 +1,6 @@
+freq_lo 0.0
+freq_up 0.5
+nfreq 10000.0
+lambda 100.0
+t_perseg 1000.0
+t_overlap 500.0

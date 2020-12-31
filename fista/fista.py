@@ -138,7 +138,7 @@ def fista(data1, data2, freqinfo, lam):
             break
         cost_pre = cost
 
-    return x
+    return freqdata, x
 
 if __name__ == '__main__':
     infile1 = 'lc1.dat'
