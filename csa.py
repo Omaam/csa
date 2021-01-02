@@ -184,10 +184,15 @@ def stcs(data1, data2, freqinfo, lam, tperseg, toverlap,
         data1_seg = _query_lightcurve(data1, segrange)
         data2_seg = _query_lightcurve(data2, segrange)
 
-        data1_seg[:,1] = data1_seg[:,1] \
-                       * signal.get_window(window, data1_seg.shape[0])
-        data2_seg[:,1] = data2_seg[:,1] \
-                       * signal.get_window(window, data2_seg.shape[0])
+        # use window fuction
+        window = Window(segrange)
+        window.hann()
+        w1 = window.gene(data1_seg[:,0])
+        w2 = window.gene(data2_seg[:,0])
+        data1_seg[:,1] = data1_seg[:,1] * w1
+        data2_seg[:,1] = data2_seg[:,1] * w2
+        # acf = window.acf()
+        ecf = window.ecf()
 
         # drop rows
         rate_drop = 0.1
@@ -196,7 +201,7 @@ def stcs(data1, data2, freqinfo, lam, tperseg, toverlap,
 
         # estimate
         freq, x_seg = fista(data1_seg, data2_seg, freqinfo, lam)
-        x_series.append(x_seg)
+        x_series.append(x_seg*ecf)
     print('finish stcs')
 
     # visualize each range
@@ -252,18 +257,22 @@ def istcs(X, data1, data2, freqinfo, tperseg, toverlap, **winargs):
 
         # reconstruct
         y1, y2 = summ.pred(data1_seg[:,0], data2_seg[:,0])
-        winobj = Window(segrange)
-        winobj.triang(winargs['basewidth'])
-        w1 = winobj(data1_seg[:,0])
-        w2 = winobj(data2_seg[:,0])
+        window = Window(segrange)
+        window.triang(winargs['basewidth'])
+        w1 = window.gene(data1_seg[:,0])
+        w2 = window.gene(data2_seg[:,0])
+        ecf = window.ecf()
         wy1 = w1 * y1
         wy2 = w2 * y2
         # plt.plot(data1_seg[:,0], wy1, data1_seg[:,0], y1)
         # plt.show()
 
-        # substitute
+        # substitution; to conserve energy, it is divided by
+        # Energy Correction Factor (ECF)
         data1_rec[indices_t1, 1] = data1_rec[indices_t1, 1] + wy1
         data2_rec[indices_t2, 1] = data2_rec[indices_t2, 1] + wy2
+        # data1_rec[indices_t1, 1] = data1_rec[indices_t1, 1] + wy1/ecf
+        # data2_rec[indices_t2, 1] = data2_rec[indices_t2, 1] + wy2/ecf
 
     fig, ax = plt.subplots(2, sharex=True)
     ax[0].plot(data2[:,0], data2[:,1],
@@ -281,15 +290,22 @@ if __name__ == '__main__':
 
     # constant
     tperseg = 1000
-    toverlap = 980
+    toverlap = 900
+    basewidth_triang = 2*(tperseg - toverlap)
 
     # load data
     data1 = np.loadtxt('example/xdata.dat')
     data2 = np.loadtxt('example/odata.dat')
+    n1 = data1.shape[0]
+    n2 = data2.shape[0]
     freqinfo = [0, 0.5, 2000]
 
     # cross-validation
-    # cvdata = cv(data1[:1000], data2[:1000], freqinfo,
+    np.random.seed(2021)
+    cv_sta = np.random.randint(toverlap, np.min([n1, n2]) - tperseg)
+    cv_end = cv_sta + tperseg
+    print(f'time range of cv: [{cv_sta}, {cv_end}]')
+    # cvdata = cv(data1[cv_sta:cv_end], data2[cv_sta:cv_end], freqinfo,
     #             lambdainfo=[1e-2, 1e3, 20])
     # np.savetxt('cvdata.dat', cvdata)
     cvdata = np.loadtxt('./cvdata.dat')
@@ -312,4 +328,5 @@ if __name__ == '__main__':
     #                    tperseg, toverlap)
     X = np.loadtxt('X.dat')
     data1, data2 = istcs(X, data1, data2, freqinfo,
-                         tperseg, toverlap, basewidth=1000)
+                         tperseg, toverlap,
+                         basewidth=basewidth_triang)

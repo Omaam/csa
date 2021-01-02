@@ -27,12 +27,32 @@ class Window():
 
         # make function
         w = lambda t: 0*t + 1
-        self.func= w
+        self.func = w
 
     def __call__(self, t):
         assert np.all((t >= self.t0) & (t <= self.tm1)), ValueError(
             f't must be between {self.t0:.3f} <= t <= {self.tm1:.3f}')
         return self.func(t - self.t0)
+
+    def gene(self, t):
+        assert np.all((t >= self.t0) & (t <= self.tm1)), ValueError(
+            f't must be between {self.t0:.3f} <= t <= {self.tm1:.3f}')
+        return self.func(t - self.t0)
+
+    def acf(self):
+        n = 1000
+        t = np.linspace(self.t0, self.tm1, n)
+        w = self.func(t - self.t0)
+        acf = 1 / (np.sum(w)/n)
+        return acf
+
+
+    def ecf(self):
+        n = 1000
+        t = np.linspace(self.t0, self.tm1, n)
+        w = self.func(t - self.t0)
+        ecf = np.sqrt(1 / (np.sum(w**2)/n))
+        return ecf
 
     def hann(self):
         self.func = np.frompyfunc(lambda t: _hann(t, self.T),
