@@ -1,7 +1,10 @@
+import time
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy import signal
+from scipy import interpolate
 import random
 from sklearn.model_selection import KFold
 from tqdm import tqdm, trange
@@ -10,6 +13,21 @@ from make_matrix import mkmat_cs, mkmat_cs_w
 from fista.fista import fista
 from window_function import Window
 from summary_handler.summary_handler import SummaryNew
+
+
+def stopwatch(func):
+    def wrapper(*arg, **kargs):
+        start = time.time()
+        res = func(*arg, **kargs)
+        dura = (time.time() - start)
+        if dura > 60:
+            dura /= 60
+            print(f'DURATION ({func.__name__}) = {dura:.3f} min')
+        else:
+            print(f'DURATION ({func.__name__}) = {dura:.3f} sec')
+        return res
+    return wrapper
+
 
 def _get_frecvec(freqinfo):
     freq_edge = np.linspace(freqinfo[0],
@@ -131,6 +149,7 @@ def cv(data1, data2, freqinfo, lambdainfo, nfold=5):
     return cvdata
 
 
+@stopwatch
 def stcs(data1, data2, freqinfo, lam, tperseg, toverlap,
          window='hann', x_name='X.dat'):
 
@@ -179,11 +198,15 @@ def stcs(data1, data2, freqinfo, lam, tperseg, toverlap,
         freq, x_seg = fista(data1_seg, data2_seg, freqinfo, lam)
         x_series.append(x_seg)
     print('finish stcs')
-    fig, ax = plt.subplots(2)
-    ax[0].plot(data1[:,0], data1[:,1])
-    ax[1].fill_betweenx(np.arange(segranges.shape[0]),
-                        segranges[:,0], segranges[:,1])
-    plt.show()
+
+    # visualize each range
+    # fig, ax = plt.subplots(2, sharex=True)
+    # ax[0].plot(data1[:,0], data1[:,1])
+    # ax[1].fill_betweenx(np.arange(segranges.shape[0]),
+    #                     segranges[:,0], segranges[:,1])
+    # ax[1].set_ylabel('Index')
+    # ax[1].set_xlabel('Time')
+    # plt.show()
 
     # output
     Zxx = np.array(x_series)
@@ -192,6 +215,7 @@ def stcs(data1, data2, freqinfo, lam, tperseg, toverlap,
     return freq, t, Zxx
 
 
+@stopwatch
 def istcs(X, data1, data2, freqinfo, tperseg, toverlap, **winargs):
     '''
     T: ndarray
@@ -241,8 +265,14 @@ def istcs(X, data1, data2, freqinfo, tperseg, toverlap, **winargs):
         data1_rec[indices_t1, 1] = data1_rec[indices_t1, 1] + wy1
         data2_rec[indices_t2, 1] = data2_rec[indices_t2, 1] + wy2
 
-    plt.plot(data1[:,0], data1[:,1],
-             data1_rec[:,0], data1_rec[:,1])
+    fig, ax = plt.subplots(2, sharex=True)
+    ax[0].plot(data2[:,0], data2[:,1],
+               data2_rec[:,0], data2_rec[:,1])
+    ax[0].set_ylabel('Optical flux')
+    ax[1].plot(data1[:,0], data1[:,1],
+               data1_rec[:,0], data1_rec[:,1])
+    ax[1].set_ylabel('X-ray flux')
+    ax[1].set_xlabel('Time')
     plt.show()
     return data1, data2
 
@@ -251,20 +281,35 @@ if __name__ == '__main__':
 
     # constant
     tperseg = 1000
-    toverlap = 900
+    toverlap = 980
 
     # load data
     data1 = np.loadtxt('example/xdata.dat')
     data2 = np.loadtxt('example/odata.dat')
     freqinfo = [0, 0.5, 2000]
 
-    # start analysis
-    cvdata = cv(data1[:1000], data2[:1000], freqinfo,
-                lambdainfo=[1e-2, 1e3, 20])
-    plt.errorbar(cvdata[:,0], cvdata[:,1], cvdata[:,2])
-    np.savetxt('cvdata.dat', cvdata)
-    plt.show()
-    # freqs, t, X = stcs(data1, data2, freqinfo, 10, tperseg, toverlap)
+    # cross-validation
+    # cvdata = cv(data1[:1000], data2[:1000], freqinfo,
+    #             lambdainfo=[1e-2, 1e3, 20])
+    # np.savetxt('cvdata.dat', cvdata)
+    cvdata = np.loadtxt('./cvdata.dat')
+    f = interpolate.interp1d(cvdata[:,0], cvdata[:,1], kind="cubic")
+    lambdas = np.logspace(np.log10(cvdata[0,0]),
+                          np.log10(cvdata[-1,0]), 100)
+    idx_min = f(lambdas).argmin()
+    lam_min = lambdas[idx_min]
+    print(f'lam_min = {lam_min}')
+    # plt.plot(lambdas, f(lambdas), linestyle=':')
+    # plt.errorbar(cvdata[:,0], cvdata[:,1], cvdata[:,2], fmt='o')
+    # plt.xscale('log')
+    # plt.yscale('log')
+    # plt.xlabel(r'$\lambda$')
+    # plt.ylabel('MSE')
+    # plt.show()
+
+    # short-time common signal analysis
+    # freqs, t, X = stcs(data1, data2, freqinfo, lam_min,
+    #                    tperseg, toverlap)
     X = np.loadtxt('X.dat')
-    data1, data2 = istcs(X, data1, data2, freqinfo, tperseg, toverlap,
-                   basewidth=1000)
+    data1, data2 = istcs(X, data1, data2, freqinfo,
+                         tperseg, toverlap, basewidth=1000)
