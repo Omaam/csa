@@ -274,15 +274,15 @@ def istcs(X, data1, data2, freqinfo, tperseg, toverlap, **winargs):
         # data1_rec[indices_t1, 1] = data1_rec[indices_t1, 1] + wy1/ecf
         # data2_rec[indices_t2, 1] = data2_rec[indices_t2, 1] + wy2/ecf
 
-    fig, ax = plt.subplots(2, sharex=True)
-    ax[0].plot(data2[:,0], data2[:,1],
-               data2_rec[:,0], data2_rec[:,1])
-    ax[0].set_ylabel('Optical flux')
-    ax[1].plot(data1[:,0], data1[:,1],
-               data1_rec[:,0], data1_rec[:,1])
-    ax[1].set_ylabel('X-ray flux')
-    ax[1].set_xlabel('Time')
-    plt.show()
+    # fig, ax = plt.subplots(2, sharex=True)
+    # ax[0].plot(data2[:,0], data2[:,1],
+    #            data2_rec[:,0], data2_rec[:,1])
+    # ax[0].set_ylabel('Optical flux')
+    # ax[1].plot(data1[:,0], data1[:,1],
+    #            data1_rec[:,0], data1_rec[:,1])
+    # ax[1].set_ylabel('X-ray flux')
+    # ax[1].set_xlabel('Time')
+    # plt.show()
     return data1, data2
 
 
