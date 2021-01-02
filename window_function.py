@@ -18,16 +18,12 @@ def _hann(t, T):
 
 class Window():
 
-    def __init__(self, t):
-
-        # check instance
-        assert isinstance(t, np.ndarray),\
-               ValueError("t must be ndarray")
+    def __init__(self, segrange):
 
         # set first time
-        self.t0 = t[0]
-        self.tm1 = t[-1]
-        self.T = t[-1] - t[0]
+        self.t0 = segrange[0]
+        self.tm1 = segrange[1]
+        self.T = segrange[1] - segrange[0]
 
         # make function
         w = lambda t: 0*t + 1

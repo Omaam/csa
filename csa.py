@@ -18,14 +18,17 @@ def _get_frecvec(freqinfo):
     freq_vec = (freq_edge[:-1] + freq_edge[1:]) / 2
     return freq_vec
 
+
 def _complement_index(ind):
     comp = np.ones(len(ind), dtype=bool)
     comp[ind] = False
     return comp
 
-def _query_lightcurve(data, limit):
-    data_out = data[np.where((limit[0] <= data[:,0]) & (data[:,0] < limit[1]))]
+
+def _query_lightcurve(data, timerage):
+    data_out = data[np.where((timerage[0] <= data[:,0]) & (data[:,0] < timerage[1]))]
     return data_out
+
 
 def _drop_sample(data, rate, seed=0):
     n_data = data.shape[0]
@@ -33,6 +36,28 @@ def _drop_sample(data, rate, seed=0):
     index_drop = np.random.choice(n_data - 1, n_drop, replace=False)
     data_del = np.delete(data, index_drop, 0)
     return data_del
+
+
+def _segment_time(t_sta, t_end, tperseg, toverlap):
+    # set constant
+    tstep = tperseg - toverlap
+    nstep = (t_end - t_sta - tperseg) // tstep + 2
+
+    # calcurate edge of lefts and rights
+    edge_left = t_sta + np.arange(nstep)*tstep
+    edge_right = t_sta + tperseg + np.arange(nstep)*tstep
+
+    # concat edges
+    segranges = np.array(list(zip(edge_left, edge_right)))
+    return segranges
+
+
+def _search_index(original, condition):
+    l = list(original)
+    indices = np.array(list(map(lambda a: l.index(a),
+                                condition)))
+    return indices
+
 
 def cs(infile1, infile2, freqinfo, lam):
 
@@ -44,12 +69,10 @@ def cs(infile1, infile2, freqinfo, lam):
 
     return fista(data1, data2, freqinfo, lam)
 
-def cv(infile1, infile2, freqinfo, lambdainfo, nfold):
+def cv(data1, data2, freqinfo, lambdainfo, nfold=5):
 
     # load infile
-    data1 = np.loadtxt(infile1)
     nrow1 = data1.shape[0]
-    data2 = np.loadtxt(infile2)
     nrow2 = data2.shape[0]
     print('data1: {}'.format(data1.shape))
     print('data2: {}'.format(data2.shape))
@@ -108,40 +131,40 @@ def cv(infile1, infile2, freqinfo, lambdainfo, nfold):
     return cvdata
 
 
-def stcs(infile1, infile2, freqinfo, lam, t_perseg, t_overlap,
-         window='hann', x_name='x_stcs.dat'):
+def stcs(data1, data2, freqinfo, lam, tperseg, toverlap,
+         window='hann', x_name='X.dat'):
+
+    # calucurate segranges
+    t_min = np.hstack([data1[:,0], data2[:,0]]).min()
+    t_max = np.hstack([data1[:,0], data2[:,0]]).max()
+    segranges = _segment_time(t_min, t_max, tperseg, toverlap)
 
     # load infile
-    data1 = np.loadtxt(infile1)
-    data2 = np.loadtxt(infile2)
     df_data1 = pd.DataFrame(data1)
     df_data2 = pd.DataFrame(data2)
 
-    # condition
-    cols = ['freq_lo', 'freq_up', 'nfreq', 'lambda', 't_perseg', 't_overlap']
-    cols_val = [freqinfo[0], freqinfo[1], freqinfo[2], lam, t_perseg, t_overlap]
-    df_stcsinfo = pd.DataFrame({'cols': cols,
-                                    'vals': cols_val})
+    # output condition
+    df_stcsinfo = pd.DataFrame({'cols': ['freq_lo', 'freq_up',
+                                         'nfreq', 'lambda',
+                                         'tperseg', 'toverlap'],
+                                'vals': [freqinfo[0], freqinfo[1],
+                                         freqinfo[2], lam,
+                                         tperseg, toverlap]})
     df_stcsinfo.to_csv('stcsinfo.txt', sep=' ', header=False, index=False)
     print(df_stcsinfo)
 
     # short time CS
     print('start stcs')
-    t_st = data1[0,0] if data1[0,0] >= data2[0,0] else data2[0,0]
-    t_en = t_st + t_perseg
-    t_en_limit = data1[-1, 0] if data1[-1, 0] <= data2[-1, 0] else data2[-1, 0]
-    iteration = int((t_en_limit - t_en) / t_overlap)
-
     x_series = []
-    t_series = []
-    for i in trange(iteration):
-        # set time range
-        t_st_q = t_st + i * t_overlap
-        t_en_q = t_en + i * t_overlap
+    for i in trange(segranges.shape[0]):
 
-        # divide
-        data1_seg = _query_lightcurve(data1, [t_st_q, t_en_q])
-        data2_seg = _query_lightcurve(data1, [t_st_q, t_en_q])
+        # set segrange
+        segrange = segranges[i]
+
+        # query time which is in segrange
+        data1_seg = _query_lightcurve(data1, segrange)
+        data2_seg = _query_lightcurve(data2, segrange)
+
         data1_seg[:,1] = data1_seg[:,1] \
                        * signal.get_window(window, data1_seg.shape[0])
         data2_seg[:,1] = data2_seg[:,1] \
@@ -155,41 +178,93 @@ def stcs(infile1, infile2, freqinfo, lam, t_perseg, t_overlap,
         # estimate
         freq, x_seg = fista(data1_seg, data2_seg, freqinfo, lam)
         x_series.append(x_seg)
-        t_series.append((t_st_q + t_en_q) * 0.5)
-
     print('finish stcs')
+    fig, ax = plt.subplots(2)
+    ax[0].plot(data1[:,0], data1[:,1])
+    ax[1].fill_betweenx(np.arange(segranges.shape[0]),
+                        segranges[:,0], segranges[:,1])
+    plt.show()
+
+    # output
     Zxx = np.array(x_series)
-    t_data = np.array(t_series)
+    t = np.mean(segranges, axis=1)
     np.savetxt(x_name, Zxx)
-    return freq, t_data, Zxx
+    return freq, t, Zxx
 
 
-def istcs(X, freqinfo, t1, t2, tsegment, toverlap):
+def istcs(X, data1, data2, freqinfo, tperseg, toverlap, **winargs):
     '''
     T: ndarray
         The series of start time of each segment
     '''
-    x = X[0]
-    summ = SummaryNew(x, freqinfo)
-    y1, y2 = summ.pred(t1)
-    print(y1.shape)
-    return y1, y2
+    # calucurate segranges
+    t_min = np.hstack([data1[:,0], data2[:,0]]).min()
+    t_max = np.hstack([data1[:,0], data2[:,0]]).max()
+    segranges = _segment_time(t_min, t_max, tperseg, toverlap)
+
+    # prepare ndarray for reconstraction
+    data1_rec = data1.copy()
+    data2_rec = data2.copy()
+    data1_rec[:,1] = np.zeros(data1.shape[0])
+    data2_rec[:,1] = np.zeros(data2.shape[0])
+
+    for i in trange(segranges.shape[0]):
+
+        # set segrange
+        segrange = segranges[i]
+
+        # query time which is in segrange
+        data1_seg = _query_lightcurve(data1, segrange)
+        data2_seg = _query_lightcurve(data2, segrange)
+
+        # search index
+        indices_t1 = _search_index(data1[:,0], data1_seg[:,0])
+        indices_t2 = _search_index(data2[:,0], data2_seg[:,0])
+
+        # make summary instance
+        # (later summary instance -> x instance)
+        x = X[i]
+        summ = SummaryNew(x, freqinfo)
+
+        # reconstruct
+        y1, y2 = summ.pred(data1_seg[:,0], data2_seg[:,0])
+        winobj = Window(segrange)
+        winobj.triang(winargs['basewidth'])
+        w1 = winobj(data1_seg[:,0])
+        w2 = winobj(data2_seg[:,0])
+        wy1 = w1 * y1
+        wy2 = w2 * y2
+        # plt.plot(data1_seg[:,0], wy1, data1_seg[:,0], y1)
+        # plt.show()
+
+        # substitute
+        data1_rec[indices_t1, 1] = data1_rec[indices_t1, 1] + wy1
+        data2_rec[indices_t2, 1] = data2_rec[indices_t2, 1] + wy2
+
+    plt.plot(data1[:,0], data1[:,1],
+             data1_rec[:,0], data1_rec[:,1])
+    plt.show()
+    return data1, data2
+
 
 if __name__ == '__main__':
-    infile1 = 'lc1.dat'
-    infile2 = 'lc2.dat'
-    freqinfo = [0, 0.5, 200]
-    lambdainfo = [1e-1, 1e2, 20]
-    cvdata = cv(infile1, infile2, freqinfo, lambdainfo, 5)
 
-    plt.errorbar(cvdata[:,0], cvdata[:,1], cvdata[:,2], fmt='o')
-    plt.xscale('log')
-    plt.xlabel(r'$\lambda$')
-    plt.ylabel('MSE')
+    # constant
+    tperseg = 1000
+    toverlap = 900
+
+    # load data
+    data1 = np.loadtxt('example/xdata.dat')
+    data2 = np.loadtxt('example/odata.dat')
+    freqinfo = [0, 0.5, 2000]
+
+    # start analysis
+    cvdata = cv(data1[:1000], data2[:1000], freqinfo,
+                lambdainfo=[1e-2, 1e3, 20])
+    plt.errorbar(cvdata[:,0], cvdata[:,1], cvdata[:,2])
+    np.savetxt('cvdata.dat', cvdata)
     plt.show()
-
-    x_data = stcs('./lc1.dat', './lc2.dat', [0, 0.5, 20], 1e-1, 10, 1)
-    np.savetxt('x_sample.dat', x_data)
-    # x_data = stcs('./gx339_x_fir_original.dat', './gx339_o_fir_original.dat',
-    #               [0,10,2000], 20, 50, 1)
-    print(x_data.shape)
+    # freqs, t, X = stcs(data1, data2, freqinfo, 10, tperseg, toverlap)
+    X = np.loadtxt('X.dat')
+    data1, data2 = istcs(X, data1, data2, freqinfo, tperseg, toverlap,
+                   basewidth=1000)
