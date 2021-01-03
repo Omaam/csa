@@ -1,6 +1,6 @@
 freq_lo 0.0
 freq_up 0.5
 nfreq 2000.0
-lambda 1.6681005372000592
+lambda 2.4201282647943834
 tperseg 1000.0
 toverlap 900.0

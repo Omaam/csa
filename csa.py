@@ -5,13 +5,12 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from scipy import signal
 from scipy import interpolate
-import random
 from sklearn.model_selection import KFold
 from tqdm import tqdm, trange
 
 from make_matrix import mkmat_cs, mkmat_cs_w
 from fista.fista import fista
-from window_function import Window
+from window_function import WindowGenerator
 from summary_handler.summary_handler import SummaryNew
 
 
@@ -28,6 +27,11 @@ def stopwatch(func):
         return res
     return wrapper
 
+
+def _sub_ave(flux):
+    f = np.array(flux)
+    f_out = f - f.mean()
+    return f_out
 
 def _get_frecvec(freqinfo):
     freq_edge = np.linspace(freqinfo[0],
@@ -95,6 +99,21 @@ def cv(data1, data2, freqinfo, lambdainfo, nfold=5):
     print('data1: {}'.format(data1.shape))
     print('data2: {}'.format(data2.shape))
 
+    # use window and subtract average
+    t_min = np.hstack([data1[:,0], data2[:,0]]).min()
+    t_max = np.hstack([data1[:,0], data2[:,0]]).max()
+    window = WindowGenerator([t_min, t_max])
+    window.hann()
+    y1_win = data1[:,1] * window.gene(data1[:,0])
+    y2_win = data2[:,1] * window.gene(data2[:,0])
+    # y1_win = _sub_ave(data1[:,1]) * window.gene(data1[:,0])
+    # y2_win = _sub_ave(data2[:,1]) * window.gene(data2[:,0])
+    data1_win = np.vstack([data1[:,0], y1_win]).T
+    data2_win = np.vstack([data2[:,0], y2_win]).T
+    # plt.plot(data1[:,0], data1[:,1],
+    #          data1_win[:,0], data1_win[:,1])
+    # plt.show()
+
     # set freq info
     freq_lo = freqinfo[0]
     freq_up = freqinfo[1]
@@ -119,17 +138,13 @@ def cv(data1, data2, freqinfo, lambdainfo, nfold=5):
         rms_vec = []
         kf1 = KFold(nfold, shuffle=True, random_state=1)
         kf2 = KFold(nfold, shuffle=True, random_state=2)
-        sp1 = kf1.split(data1)
-        sp2 = kf2.split(data2)
+        sp1 = kf1.split(data1_win)
+        sp2 = kf2.split(data2_win)
         for (index_tr1, index_te1), (index_tr2, index_te2) in zip(sp1, sp2):
-            # print('index_tr1: {}'.format(index_tr1))
-            # print('index_te1: {}'.format(index_te1))
-            # print('index_tr2: {}'.format(index_tr2))
-            # print('index_te2: {}'.format(index_te2))
-            data1_tr = data1[index_tr1]
-            data1_te = data1[index_te1]
-            data2_tr = data2[index_tr2]
-            data2_te = data2[index_te2]
+            data1_tr = data1_win[index_tr1]
+            data1_te = data1_win[index_te1]
+            data2_tr = data2_win[index_tr2]
+            data2_te = data2_win[index_te2]
 
             # calcurate rms
             freq, x_tr = fista(data1_tr, data2_tr, freqinfo, lam)
@@ -183,24 +198,26 @@ def stcs(data1, data2, freqinfo, lam, tperseg, toverlap,
         # query time which is in segrange
         data1_seg = _query_lightcurve(data1, segrange)
         data2_seg = _query_lightcurve(data2, segrange)
+        data1_seg_win = data1_seg.copy()
+        data2_seg_win = data2_seg.copy()
 
         # use window fuction
-        window = Window(segrange)
+        window = WindowGenerator(segrange)
         window.hann()
-        w1 = window.gene(data1_seg[:,0])
-        w2 = window.gene(data2_seg[:,0])
-        data1_seg[:,1] = data1_seg[:,1] * w1
-        data2_seg[:,1] = data2_seg[:,1] * w2
-        # acf = window.acf()
-        ecf = window.ecf()
+        data1_seg_win[:,1] = _sub_ave(data1_seg[:,1]) * window.gene(data1_seg[:,0])
+        data2_seg_win[:,1] = _sub_ave(data2_seg[:,1]) * window.gene(data2_seg[:,0])
+        # data1_seg_win[:,1] = data1_seg[:,1] * window.gene(data1_seg[:,0])
+        # data2_seg_win[:,1] = data2_seg[:,1] * window.gene(data2_seg[:,0])
+        acf = window.acf
+        ecf = window.ecf
 
         # drop rows
-        rate_drop = 0.1
-        data1_seg_del = _drop_sample(data1_seg, rate_drop, seed=11)
-        data2_seg_del = _drop_sample(data2_seg, rate_drop, seed=12)
+        # rate_drop = 0.1
+        # data1_seg_del = _drop_sample(data1_seg_win, rate_drop, seed=11)
+        # data2_seg_del = _drop_sample(data2_seg_win, rate_drop, seed=12)
 
         # estimate
-        freq, x_seg = fista(data1_seg, data2_seg, freqinfo, lam)
+        freq, x_seg = fista(data1_seg_win, data2_seg_win, freqinfo, lam)
         x_series.append(x_seg*ecf)
     print('finish stcs')
 
@@ -245,6 +262,8 @@ def istcs(X, data1, data2, freqinfo, tperseg, toverlap, **winargs):
         # query time which is in segrange
         data1_seg = _query_lightcurve(data1, segrange)
         data2_seg = _query_lightcurve(data2, segrange)
+        y1_ave = np.mean(data1_seg[:,1])
+        y2_ave = np.mean(data2_seg[:,1])
 
         # search index
         indices_t1 = _search_index(data1[:,0], data1_seg[:,0])
@@ -257,32 +276,34 @@ def istcs(X, data1, data2, freqinfo, tperseg, toverlap, **winargs):
 
         # reconstruct
         y1, y2 = summ.pred(data1_seg[:,0], data2_seg[:,0])
-        window = Window(segrange)
+        window = WindowGenerator(segrange)
         window.triang(winargs['basewidth'])
         w1 = window.gene(data1_seg[:,0])
         w2 = window.gene(data2_seg[:,0])
-        ecf = window.ecf()
-        wy1 = w1 * y1
-        wy2 = w2 * y2
-        # plt.plot(data1_seg[:,0], wy1, data1_seg[:,0], y1)
-        # plt.show()
+        wy1 = w1 * (y1 + np.mean(data1[:,1]))
+        wy2 = w2 * (y2 + np.mean(data2[:,1]))
 
         # substitution; to conserve energy, it is divided by
         # Energy Correction Factor (ECF)
-        data1_rec[indices_t1, 1] = data1_rec[indices_t1, 1] + wy1
-        data2_rec[indices_t2, 1] = data2_rec[indices_t2, 1] + wy2
-        # data1_rec[indices_t1, 1] = data1_rec[indices_t1, 1] + wy1/ecf
-        # data2_rec[indices_t2, 1] = data2_rec[indices_t2, 1] + wy2/ecf
+        win_sect = window.sect
+        need_sect = (tperseg - toverlap) * 1
+        data1_rec[indices_t1, 1] = data1_rec[indices_t1, 1] \
+                                 + wy1 * (need_sect/win_sect)
+        data2_rec[indices_t2, 1] = data2_rec[indices_t2, 1] \
+                                 + wy2 * (need_sect/win_sect)
 
-    # fig, ax = plt.subplots(2, sharex=True)
-    # ax[0].plot(data2[:,0], data2[:,1],
-    #            data2_rec[:,0], data2_rec[:,1])
-    # ax[0].set_ylabel('Optical flux')
-    # ax[1].plot(data1[:,0], data1[:,1],
-    #            data1_rec[:,0], data1_rec[:,1])
-    # ax[1].set_ylabel('X-ray flux')
-    # ax[1].set_xlabel('Time')
-    # plt.show()
+    fig, ax = plt.subplots(2, sharex=True)
+    ax[0].plot(data2[:,0], data2[:,1],
+               data2_rec[:,0], data2_rec[:,1],
+               data2[:,0], _sub_ave(data2[:,1]))
+    ax[0].set_ylabel('Optical flux')
+    ax[1].plot(data1[:,0], data1[:,1],
+               data1_rec[:,0], data1_rec[:,1],
+               data1[:,0], _sub_ave(data1[:,1]))
+    ax[1].set_ylabel('X-ray flux')
+    ax[1].set_xlabel('Time')
+    fig.savefig('lc_ncf.png')
+    plt.show()
     return data1, data2
 
 
@@ -306,7 +327,7 @@ if __name__ == '__main__':
     cv_end = cv_sta + tperseg
     print(f'time range of cv: [{cv_sta}, {cv_end}]')
     # cvdata = cv(data1[cv_sta:cv_end], data2[cv_sta:cv_end], freqinfo,
-    #             lambdainfo=[1e-2, 1e3, 20])
+    #             [1e-2, 1e2, 20])
     # np.savetxt('cvdata.dat', cvdata)
     cvdata = np.loadtxt('./cvdata.dat')
     f = interpolate.interp1d(cvdata[:,0], cvdata[:,1], kind="cubic")
@@ -315,6 +336,8 @@ if __name__ == '__main__':
     idx_min = f(lambdas).argmin()
     lam_min = lambdas[idx_min]
     print(f'lam_min = {lam_min}')
+
+    # plot cvdata
     # plt.plot(lambdas, f(lambdas), linestyle=':')
     # plt.errorbar(cvdata[:,0], cvdata[:,1], cvdata[:,2], fmt='o')
     # plt.xscale('log')

@@ -1,8 +1,8 @@
 import numpy as np
 
 def make_matrix(t, f):
-    t = np.array([t])
-    f = np.array([f])
+    t = np.array([t]).astype(float)
+    f = np.array([f]).astype(float)
     phase = 2 * np.pi * np.dot(t.T, f)
     mat = np.hstack([np.cos(phase), np.sin(phase)])
     return mat

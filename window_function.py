@@ -16,7 +16,7 @@ def _hann(t, T):
     w = 0.5 - 0.5*np.cos(2*np.pi*t/T)
     return w
 
-class Window():
+class WindowGenerator():
 
     def __init__(self, segrange):
 
@@ -57,12 +57,18 @@ class Window():
     def hann(self):
         self.func = np.frompyfunc(lambda t: _hann(t, self.T),
                                   1, 1)
+        self.sect = 0.5 * self.T
+        self.ecf = 1.63
+        self.acf = 2.0
 
     def triang(self, basewidth):
         # set triangular function as universal function by using
         # numpy.frompyfunc
         self.func = np.frompyfunc(lambda t: _triang(t, basewidth, self.T),
                                   1, 1)
+        self.sect = 0.5 * basewidth
+        self.acf = (basewidth/2)/self.T
+        self.ecf = 2/3 * basewidth #?
 
 
 def main():
