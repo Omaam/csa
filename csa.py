@@ -1,4 +1,7 @@
 import time
+import os
+import sys
+sys.path.append('summary_handler')
 
 import numpy as np
 import pandas as pd
@@ -14,20 +17,36 @@ from window_function import WindowGenerator
 from summary_handler.summary_handler import SummaryNew
 
 
+__all__ = ['cs', 'cv', 'stcs', 'istcs']
+
+
+# decorators
 def stopwatch(func):
     def wrapper(*arg, **kargs):
         start = time.time()
         res = func(*arg, **kargs)
         dura = (time.time() - start)
-        if dura > 60:
-            dura /= 60
-            print(f'DURATION ({func.__name__}) = {dura:.3f} min')
-        else:
-            print(f'DURATION ({func.__name__}) = {dura:.3f} sec')
+        print(time.strftime(f'{func.__name__} %H:%M\'%S\"',
+                            time.gmtime(dura)))
         return res
     return wrapper
 
 
+def change_directory(path_to_dir):
+    def _change_directory(func):
+        def wrapper(*args, **kargs):
+            current_dir = os.getcwd()
+            if os.path.exists(path_to_dir) is False:
+                os.makedirs(path_to_dir)
+            os.chdir(path_to_dir)
+            results = func(*args, **kargs)
+            os.chdir(current_dir)
+            return(results)
+        return wrapper
+    return _change_directory
+
+
+# functions for csa
 def _sub_ave(flux):
     f = np.array(flux)
     f_out = f - f.mean()
@@ -81,6 +100,7 @@ def _search_index(original, condition):
     return indices
 
 
+# main functions; cs, cv stcs istcs
 def cs(infile1, infile2, freqinfo, lam):
 
     # load infile
@@ -305,20 +325,20 @@ def istcs(X, data1, data2, freqinfo, tperseg, toverlap, **winargs):
     ax[1].set_ylabel('X-ray flux')
     ax[1].set_xlabel('Time')
     # fig.savefig('lc_ncf.png')
-    # plt.show()
+    plt.show()
     return data1, data2
 
 
-if __name__ == '__main__':
-
+@change_directory('example')
+def main():
     # constant
     tperseg = 1000
-    toverlap = 900
+    toverlap = 980
     basewidth_triang = 2*(tperseg - toverlap)
 
     # load data
-    data1 = np.loadtxt('example/xdata.dat')
-    data2 = np.loadtxt('example/odata.dat')
+    data1 = np.loadtxt('xdata.dat')
+    data2 = np.loadtxt('odata.dat')
     n1 = data1.shape[0]
     n2 = data2.shape[0]
     freqinfo = [0, 0.5, 2000]
@@ -328,9 +348,9 @@ if __name__ == '__main__':
     cv_sta = np.random.randint(toverlap, np.min([n1, n2]) - tperseg)
     cv_end = cv_sta + tperseg
     print(f'time range of cv: [{cv_sta}, {cv_end}]')
-    # cvdata = cv(data1[cv_sta:cv_end], data2[cv_sta:cv_end], freqinfo,
-                # [1e-2, 1e2, 20])
-    # np.savetxt('cvdata.dat', cvdata)
+    cvdata = cv(data1[cv_sta:cv_end], data2[cv_sta:cv_end], freqinfo,
+                [1e-2, 1e2, 20])
+    np.savetxt('cvdata.dat', cvdata)
     cvdata = np.loadtxt('./cvdata.dat')
     f = interpolate.interp1d(cvdata[:,0], cvdata[:,1], kind="cubic")
     lambdas = np.logspace(np.log10(cvdata[0,0]),
@@ -340,18 +360,22 @@ if __name__ == '__main__':
     print(f'lam_min = {lam_min}')
 
     # plot cvdata
-    # plt.plot(lambdas, f(lambdas), linestyle=':')
-    # plt.errorbar(cvdata[:,0], cvdata[:,1], cvdata[:,2], fmt='o')
-    # plt.xscale('log')
-    # plt.yscale('log')
-    # plt.xlabel(r'$\lambda$')
-    # plt.ylabel('MSE')
-    # plt.show()
+    plt.plot(lambdas, f(lambdas), linestyle=':')
+    plt.errorbar(cvdata[:,0], cvdata[:,1], cvdata[:,2], fmt='o')
+    plt.xscale('log')
+    plt.yscale('log')
+    plt.xlabel(r'$\lambda$')
+    plt.ylabel('MSE')
+    plt.show()
 
     # short-time common signal analysis
-    freqs, t, X = stcs(data1, data2, freqinfo, lam_min,
-                       tperseg, toverlap)
-    X = np.loadtxt('X.dat')
-    data1, data2 = istcs(X, data1, data2, freqinfo,
-                         tperseg, toverlap,
-                         basewidth=basewidth_triang)
+    # freqs, t, X = stcs(data1, data2, freqinfo, lam_min,
+    #                    tperseg, toverlap)
+    # X = np.loadtxt('X.dat')
+    # data1, data2 = istcs(X, data1, data2, freqinfo,
+    #                      tperseg, toverlap,
+    #                      basewidth=basewidth_triang)
+
+
+if __name__ == '__main__':
+    main()

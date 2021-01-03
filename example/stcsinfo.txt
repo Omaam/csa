@@ -1,6 +1,6 @@
 freq_lo 0.0
 freq_up 0.5
-nfreq 10000.0
-lambda 100.0
-t_perseg 1000.0
-t_overlap 500.0
+nfreq 2000.0
+lambda 0.49770235643321115
+tperseg 1000.0
+toverlap 980.0
