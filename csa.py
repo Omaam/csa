@@ -228,8 +228,6 @@ def stcs(data1, data2, freqinfo, lam, tperseg, toverlap,
         window.hann()
         data1_seg_win[:,1] = _sub_ave(data1_seg[:,1]) * window.gene(data1_seg[:,0])
         data2_seg_win[:,1] = _sub_ave(data2_seg[:,1]) * window.gene(data2_seg[:,0])
-        # data1_seg_win[:,1] = data1_seg[:,1] * window.gene(data1_seg[:,0])
-        # data2_seg_win[:,1] = data2_seg[:,1] * window.gene(data2_seg[:,0])
         acf = window.acf
         ecf = window.ecf
 
@@ -314,26 +312,20 @@ def istcs(X, data1, data2, freqinfo, tperseg, toverlap, **winargs):
         data2_rec[indices_t2, 1] = data2_rec[indices_t2, 1] \
                                  + wy2 * (need_sect/win_sect)
 
-    fig, ax = plt.subplots(2, sharex=True)
-    ax[0].plot(data2[:,0], data2[:,1],
-               data2_rec[:,0], data2_rec[:,1],
-               data2[:,0], _sub_ave(data2[:,1]))
-    ax[0].set_ylabel('Optical flux')
-    ax[1].plot(data1[:,0], data1[:,1],
-               data1_rec[:,0], data1_rec[:,1],
-               data1[:,0], _sub_ave(data1[:,1]))
-    ax[1].set_ylabel('X-ray flux')
-    ax[1].set_xlabel('Time')
-    # fig.savefig('lc_ncf.png')
-    plt.show()
-    return data1, data2
+    return data1_rec, data2_rec
 
 
 @change_directory('example')
 def main():
+
+    # analysis option
+    CV = 0
+    STCS = 1
+    ISTCS = 1
+
     # constant
     tperseg = 1000
-    toverlap = 980
+    toverlap = 900
     basewidth_triang = 2*(tperseg - toverlap)
 
     # load data
@@ -344,13 +336,23 @@ def main():
     freqinfo = [0, 0.5, 2000]
 
     # cross-validation
-    np.random.seed(2021)
-    cv_sta = np.random.randint(toverlap, np.min([n1, n2]) - tperseg)
-    cv_end = cv_sta + tperseg
-    print(f'time range of cv: [{cv_sta}, {cv_end}]')
-    cvdata = cv(data1[cv_sta:cv_end], data2[cv_sta:cv_end], freqinfo,
-                [1e-2, 1e2, 20])
-    np.savetxt('cvdata.dat', cvdata)
+    if CV:
+        np.random.seed(2021)
+        cv_sta = np.random.randint(toverlap, np.min([n1, n2]) - tperseg)
+        cv_end = cv_sta + tperseg
+        print(f'time range of cv: [{cv_sta}, {cv_end}]')
+        cvdata = cv(data1[cv_sta:cv_end], data2[cv_sta:cv_end], freqinfo,
+                    [1e-2, 1e2, 20])
+        np.savetxt('cvdata.dat', cvdata)
+
+        # plot cvdata
+        plt.plot(lambdas, f(lambdas), linestyle=':')
+        plt.errorbar(cvdata[:,0], cvdata[:,1], cvdata[:,2], fmt='o')
+        plt.xscale('log')
+        plt.yscale('log')
+        plt.xlabel(r'$\lambda$')
+        plt.ylabel('MSE')
+        plt.show()
     cvdata = np.loadtxt('./cvdata.dat')
     f = interpolate.interp1d(cvdata[:,0], cvdata[:,1], kind="cubic")
     lambdas = np.logspace(np.log10(cvdata[0,0]),
@@ -359,22 +361,29 @@ def main():
     lam_min = lambdas[idx_min]
     print(f'lam_min = {lam_min}')
 
-    # plot cvdata
-    plt.plot(lambdas, f(lambdas), linestyle=':')
-    plt.errorbar(cvdata[:,0], cvdata[:,1], cvdata[:,2], fmt='o')
-    plt.xscale('log')
-    plt.yscale('log')
-    plt.xlabel(r'$\lambda$')
-    plt.ylabel('MSE')
-    plt.show()
-
     # short-time common signal analysis
-    # freqs, t, X = stcs(data1, data2, freqinfo, lam_min,
-    #                    tperseg, toverlap)
-    # X = np.loadtxt('X.dat')
-    # data1, data2 = istcs(X, data1, data2, freqinfo,
-    #                      tperseg, toverlap,
-    #                      basewidth=basewidth_triang)
+    if STCS:
+        freqs, t, X = stcs(data1, data2, freqinfo, lam_min,
+                           tperseg, toverlap)
+
+    # inverse short-time common signal analysis
+    if ISTCS:
+        X = np.loadtxt('X.dat')
+        data1_rec, data2_rec = istcs(X, data1, data2, freqinfo,
+                             tperseg, toverlap,
+                             basewidth=basewidth_triang)
+
+        fig, ax = plt.subplots(2, sharex=True)
+        ax[0].plot(data2[:,0], data2[:,1],
+                   data2_rec[:,0], data2_rec[:,1],)
+        ax[0].set_ylabel('Optical flux')
+        ax[0].legend(['original', 'istcs'])
+        ax[1].plot(data1[:,0], data1[:,1],
+                   data1_rec[:,0], data1_rec[:,1],)
+        ax[1].set_ylabel('X-ray flux')
+        ax[1].set_xlabel('Time')
+        # fig.savefig('lc_ecf.png')
+        # plt.show()
 
 
 if __name__ == '__main__':
