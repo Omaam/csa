@@ -91,6 +91,7 @@ def cs(infile1, infile2, freqinfo, lam):
 
     return fista(data1, data2, freqinfo, lam)
 
+@stopwatch
 def cv(data1, data2, freqinfo, lambdainfo, nfold=5):
 
     # load infile
@@ -100,16 +101,17 @@ def cv(data1, data2, freqinfo, lambdainfo, nfold=5):
     print('data2: {}'.format(data2.shape))
 
     # use window and subtract average
+    data1_win = data1.copy()
+    data2_win = data2.copy()
     t_min = np.hstack([data1[:,0], data2[:,0]]).min()
     t_max = np.hstack([data1[:,0], data2[:,0]]).max()
     window = WindowGenerator([t_min, t_max])
     window.hann()
-    y1_win = data1[:,1] * window.gene(data1[:,0])
-    y2_win = data2[:,1] * window.gene(data2[:,0])
-    # y1_win = _sub_ave(data1[:,1]) * window.gene(data1[:,0])
-    # y2_win = _sub_ave(data2[:,1]) * window.gene(data2[:,0])
-    data1_win = np.vstack([data1[:,0], y1_win]).T
-    data2_win = np.vstack([data2[:,0], y2_win]).T
+    # data1_win[:,1] = data1[:,1] * window.gene(data1[:,0])
+    # data2_win[:,1] = data2[:,1] * window.gene(data2[:,0])
+    data1_win[:,1] = _sub_ave(data1[:,1]) * window.gene(data1[:,0])
+    data2_win[:,1] = _sub_ave(data2[:,1]) * window.gene(data2[:,0])
+
     # plt.plot(data1[:,0], data1[:,1],
     #          data1_win[:,0], data1_win[:,1])
     # plt.show()
@@ -302,8 +304,8 @@ def istcs(X, data1, data2, freqinfo, tperseg, toverlap, **winargs):
                data1[:,0], _sub_ave(data1[:,1]))
     ax[1].set_ylabel('X-ray flux')
     ax[1].set_xlabel('Time')
-    fig.savefig('lc_ncf.png')
-    plt.show()
+    # fig.savefig('lc_ncf.png')
+    # plt.show()
     return data1, data2
 
 
@@ -327,7 +329,7 @@ if __name__ == '__main__':
     cv_end = cv_sta + tperseg
     print(f'time range of cv: [{cv_sta}, {cv_end}]')
     # cvdata = cv(data1[cv_sta:cv_end], data2[cv_sta:cv_end], freqinfo,
-    #             [1e-2, 1e2, 20])
+                # [1e-2, 1e2, 20])
     # np.savetxt('cvdata.dat', cvdata)
     cvdata = np.loadtxt('./cvdata.dat')
     f = interpolate.interp1d(cvdata[:,0], cvdata[:,1], kind="cubic")
@@ -347,8 +349,8 @@ if __name__ == '__main__':
     # plt.show()
 
     # short-time common signal analysis
-    # freqs, t, X = stcs(data1, data2, freqinfo, lam_min,
-    #                    tperseg, toverlap)
+    freqs, t, X = stcs(data1, data2, freqinfo, lam_min,
+                       tperseg, toverlap)
     X = np.loadtxt('X.dat')
     data1, data2 = istcs(X, data1, data2, freqinfo,
                          tperseg, toverlap,
