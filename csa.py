@@ -16,9 +16,9 @@ from sklearn.model_selection import KFold
 from tqdm import tqdm, trange
 
 from make_matrix import mkmat_cs, mkmat_cs_w
-from fista.fista import fista
+from fista import fista
 from window_function import WindowGenerator
-from summary_handler.summary_handler import SummaryNew
+from summary_handler import SummaryNew
 import xhandler as xhan
 
 

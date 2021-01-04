@@ -22,7 +22,7 @@ def stopwatch(func):
     return wrapper
 
 
-def _container_forX(func, X, *args, **kargs):
+def _adjuster_forX(func, X, *args, **kargs):
     '''Container for a X.
        By using this, it is possible to use
        functions without taking care of the
@@ -141,7 +141,7 @@ def query_forX(X, freqinfo, para, pararanges,
 
     '''
     '''
-    X_out = _container_forX(_query_forX, X, freqinfo, para, pararanges,
+    X_out = _adjuster_forX(_query_forX, X, freqinfo, para, pararanges,
                             mode=mode, anti=anti, periodic=periodic)
     return X_out
 
@@ -182,7 +182,7 @@ def signiftest(X, freqinfo, testrange, lagbinwidth=1,
                iteration=1000, ci=0.9, periodic=False, anti=False):
     '''
     '''
-    X_out = _container_forX(_signiftest, X, freqinfo, testrange,
+    X_out = _adjuster_forX(_signiftest, X, freqinfo, testrange,
                             lagbinwidth=lagbinwidth,
                             iteration=iteration, ci=ci,
                             periodic=periodic, anti=anti)
@@ -201,6 +201,9 @@ def _signiftest(x, freqinfo, testrange, lagbinwidth=1,
                           periodic=periodic)
     return x_signif
 
+
+def subtractX(X_minuend, X_subtrahend):
+    return X_diff
 
 # not used
 class XXX():
