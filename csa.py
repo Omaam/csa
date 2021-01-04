@@ -325,7 +325,7 @@ def main():
 
     # constant
     tperseg = 1000
-    toverlap = 900
+    toverlap = 980
     basewidth_triang = 2*(tperseg - toverlap)
 
     # load data

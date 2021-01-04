@@ -24,6 +24,13 @@ from summary_handler.summary_handler import SummaryNew
 __all__ = ['cs', 'cv', 'stcs', 'istcs']
 
 
+# analysis option
+CV = 0
+STCS = 0
+ISTCS = 0
+
+FIGSHOW = 1
+
 # decorators
 def stopwatch(func):
     def wrapper(*arg, **kargs):
@@ -55,6 +62,11 @@ def _sub_ave(flux):
     f = np.array(flux)
     f_out = f - f.mean()
     return f_out
+
+
+def _get_minmax(*args):
+    a = np.hstack(args)
+    return a.min(), a.max()
 
 def _get_frecvec(freqinfo):
     freq_edge = np.linspace(freqinfo[0],
@@ -103,6 +115,22 @@ def _search_index(original, condition):
                                 condition)))
     return indices
 
+def _lambda_fromcvdata(cvdata, mode='min'):
+    spl = interpolate.interp1d(cvdata[:,0], cvdata[:,1], kind="cubic")
+    lambdas = np.logspace(np.log10(cvdata[0,0]),
+                          np.log10(cvdata[-1,0]), 100)
+    idx_min = spl(lambdas).argmin()
+
+    if mode == 'min':
+        return lambdas[idx_min]
+
+    elif mode == 'ose':
+        idx_min_data = cvdata[:,1].argmin()
+        mse_p_std_min = cvdata[idx_min_data,1:].sum()
+        lambdas_aftermin = lambdas[idx_min:].copy()
+        idx_ose = np.searchsorted(spl(lambdas[idx_min:]), mse_p_std_min)
+        return lambdas[idx_min + idx_ose]
+
 
 # main functions; cs, cv stcs istcs
 def cs(infile1, infile2, freqinfo, lam):
@@ -115,77 +143,62 @@ def cs(infile1, infile2, freqinfo, lam):
 
     return fista(data1, data2, freqinfo, lam)
 
+
+def _cv(data1, data2, freqinfo, lam, nfold=5):
+
+    # freq vector
+    freqs = _get_frecvec(freqinfo)
+
+    # get nfold index
+    kf1 = KFold(nfold, shuffle=True)#, random_state=1)
+    kf2 = KFold(nfold, shuffle=True)#, random_state=2)
+    sp1 = kf1.split(data1)
+    sp2 = kf2.split(data2)
+
+    # cross-validation
+    rms = np.zeros(nfold)
+    for i, ((i_tr1, i_te1), (i_tr2, i_te2)) in enumerate(zip(sp1, sp2)):
+        # split data into one for train and test
+        data1_tr, data1_te = data1[i_tr1], data1[i_te1]
+        data2_tr, data2_te = data2[i_tr2], data2[i_te2]
+
+        # calcurate rms
+        freq, x_tr = fista(data1_tr, data2_tr, freqinfo, lam)
+        A_mat_te = mkmat_cs(data1_te[:,0], data2_te[:,0], freqs)
+        y_te = np.dot(A_mat_te, x_tr)
+        data_te = np.hstack([data1_te[:,1], data2_te[:,1]])
+        rms[i] = np.sqrt(np.dot((data_te - y_te).T, data_te - y_te))
+    return rms.mean(), rms.std()
+
+
 @stopwatch
 def cv(data1, data2, freqinfo, lambdainfo, nfold=5):
-
-    # load infile
-    nrow1 = data1.shape[0]
-    nrow2 = data2.shape[0]
-    print('data1: {}'.format(data1.shape))
-    print('data2: {}'.format(data2.shape))
 
     # use window and subtract average
     data1_win = data1.copy()
     data2_win = data2.copy()
-    t_min = np.hstack([data1[:,0], data2[:,0]]).min()
-    t_max = np.hstack([data1[:,0], data2[:,0]]).max()
-    window = WindowGenerator([t_min, t_max])
+    t_minmax = _get_minmax(data1[:,0], data2[:,0])
+    window = WindowGenerator(t_minmax)
     window.hann()
-    # data1_win[:,1] = data1[:,1] * window.gene(data1[:,0])
-    # data2_win[:,1] = data2[:,1] * window.gene(data2[:,0])
     data1_win[:,1] = _sub_ave(data1[:,1]) * window.gene(data1[:,0])
     data2_win[:,1] = _sub_ave(data2[:,1]) * window.gene(data2[:,0])
 
-    # plt.plot(data1[:,0], data1[:,1],
-    #          data1_win[:,0], data1_win[:,1])
-    # plt.show()
-
-    # set freq info
-    freq_lo = freqinfo[0]
-    freq_up = freqinfo[1]
-    nfreq   = freqinfo[2]
-    delta_freq = (freq_up - freq_lo) / nfreq
-    freqdata = _get_frecvec(freqinfo)
 
     # set lambda info
-    lambda_lo = lambdainfo[0]
-    lambda_up = lambdainfo[1]
-    nlambda   = lambdainfo[2]
-    lambda_vec = np.logspace(np.log10(lambda_lo),
-                             np.log10(lambda_up),
-                             nlambda)
-    print('lambda_vec:\n{}'.format(lambda_vec))
+    lambdas = np.logspace(np.log10(lambdainfo[0]),
+                          np.log10(lambdainfo[1]),
+                          lambdainfo[2])
+    print('lambdas:\n{}'.format(lambdas))
 
-    rms_mean_vec = []
-    rms_sd_vec = []
-    for lam in tqdm(lambda_vec):
-
-        # get nfold index
-        rms_vec = []
-        kf1 = KFold(nfold, shuffle=True, random_state=1)
-        kf2 = KFold(nfold, shuffle=True, random_state=2)
-        sp1 = kf1.split(data1_win)
-        sp2 = kf2.split(data2_win)
-        for (index_tr1, index_te1), (index_tr2, index_te2) in zip(sp1, sp2):
-            data1_tr = data1_win[index_tr1]
-            data1_te = data1_win[index_te1]
-            data2_tr = data2_win[index_tr2]
-            data2_te = data2_win[index_te2]
-
-            # calcurate rms
-            freq, x_tr = fista(data1_tr, data2_tr, freqinfo, lam)
-            A_mat_te = mkmat_cs(data1_te[:,0], data2_te[:,0], freqdata)
-            y_te = np.dot(A_mat_te, x_tr)
-            data_te = np.hstack([data1_te[:,1], data2_te[:,1]])
-            rms = np.sqrt(np.dot((data_te - y_te).T, data_te - y_te))
-            rms_vec.append(rms)
-
-        rms_vec = np.array(rms_vec)
-        rms_mean_vec.append(rms_vec.mean())
-        rms_sd_vec.append(rms_vec.std())
-    rms_mean_vec = np.array(rms_mean_vec)
-    rms_sd_vec = np.array(rms_sd_vec)
-    cvdata = np.vstack([lambda_vec, rms_mean_vec, rms_sd_vec]).T
+    # cross-validation with multi process
+    cvdata = np.zeros((3, lambdas.shape[0])).T
+    cvdata[:,0] = lambdas
+    with ProcessPoolExecutor(MAX_WORKERS) as executor:
+        futures = tqdm([executor.submit(_cv, data1=data1_win, data2=data2_win,
+                                        freqinfo=freqinfo, lam=lam)
+                       for lam in lambdas])
+        for k, future in enumerate(futures):
+            cvdata[k,1:] = future.result()
 
     return cvdata
 
@@ -222,8 +235,7 @@ def stcs(data1, data2, freqinfo, lam, tperseg, toverlap,
          window='hann', x_name='X.dat'):
 
     # calucurate segranges
-    t_min = np.hstack([data1[:,0], data2[:,0]]).min()
-    t_max = np.hstack([data1[:,0], data2[:,0]]).max()
+    t_min, t_max = _get_minmax(data1[:,0], data2[:,0])
     segranges = _segment_time(t_min, t_max, tperseg, toverlap)
 
     # load infile
@@ -294,8 +306,7 @@ def istcs(X, data1, data2, freqinfo, tperseg, toverlap, **winargs):
         The series of start time of each segment
     '''
     # calucurate segranges
-    t_min = np.hstack([data1[:,0], data2[:,0]]).min()
-    t_max = np.hstack([data1[:,0], data2[:,0]]).max()
+    t_min, t_max = _get_minmax(data1[:,0], data2[:,0])
     segranges = _segment_time(t_min, t_max, tperseg, toverlap)
 
     # prepare ndarray for reconstraction
@@ -332,14 +343,9 @@ def istcs(X, data1, data2, freqinfo, tperseg, toverlap, **winargs):
 @change_directory('example')
 def main():
 
-    # analysis option
-    CV = 0
-    STCS = 1
-    ISTCS = 1
-
     # constant
     tperseg = 1000
-    toverlap = 900
+    toverlap = 980
     basewidth_triang = 2*(tperseg - toverlap)
 
     # load data
@@ -356,23 +362,24 @@ def main():
         cv_end = cv_sta + tperseg
         print(f'time range of cv: [{cv_sta}, {cv_end}]')
         cvdata = cv(data1[cv_sta:cv_end], data2[cv_sta:cv_end], freqinfo,
-                    [1e-2, 1e2, 20])
+                    [1e-2, 1e3, 20])
         np.savetxt('cvdata.dat', cvdata)
 
         # plot cvdata
+        lambdas = np.logspace(np.log10(cvdata[0,0]),
+                              np.log10(cvdata[-1,0]), 100)
+        f = interpolate.interp1d(cvdata[:,0], cvdata[:,1], kind="cubic")
         plt.plot(lambdas, f(lambdas), linestyle=':')
         plt.errorbar(cvdata[:,0], cvdata[:,1], cvdata[:,2], fmt='o')
         plt.xscale('log')
         plt.yscale('log')
         plt.xlabel(r'$\lambda$')
         plt.ylabel('MSE')
-        plt.show()
+        plt.savefig('cvcurve.png')
+        if FIGSHOW:
+            plt.show()
     cvdata = np.loadtxt('./cvdata.dat')
-    f = interpolate.interp1d(cvdata[:,0], cvdata[:,1], kind="cubic")
-    lambdas = np.logspace(np.log10(cvdata[0,0]),
-                          np.log10(cvdata[-1,0]), 100)
-    idx_min = f(lambdas).argmin()
-    lam_min = lambdas[idx_min]
+    lam_min = _lambda_fromcvdata(cvdata, mode='min')
     print(f'lam_min = {lam_min}')
 
     # short-time common signal analysis
@@ -397,7 +404,8 @@ def main():
         ax[1].set_ylabel('X-ray flux')
         ax[1].set_xlabel('Time')
         fig.savefig('lc_ecf.png')
-        # plt.show()
+        if FIGSHOW:
+            plt.show()
 
 if __name__ == '__main__':
     main()
