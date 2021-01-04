@@ -413,8 +413,8 @@ def main():
                    data1_rec[:,0], data1_rec[:,1],)
         ax[1].set_ylabel('X-ray flux')
         ax[1].set_xlabel('Time')
+        fig.savefig('lc_ecf.png')
         if FIGSHOW:
-            fig.savefig('lc_ecf.png')
             plt.show()
 
 
