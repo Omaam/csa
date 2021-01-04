@@ -37,9 +37,10 @@ FIGSHOW = 0
 def stopwatch(func):
     def wrapper(*arg, **kargs):
         start = time.time()
+        print(f'start {func.__name__}')
         res = func(*arg, **kargs)
         dura = (time.time() - start)
-        print(time.strftime(f'{func.__name__} %H:%M\'%S\"',
+        print(time.strftime(f'finish {func.__name__}: %H:%M\'%S\"',
                             time.gmtime(dura)))
         return res
     return wrapper
@@ -392,12 +393,13 @@ def main():
     # inverse short-time common signal analysis
     if ISTCS:
         X = np.loadtxt('X.dat')
+        print(X.shape)
 
         # query lag comp. around true lag
         X_lag = xhan.signiftest(X, freqinfo, testrange=[-10, 10])
 
         # istcs
-        data1_rec, data2_rec = istcs(X_lag, data1, data2, freqinfo,
+        data1_rec, data2_rec = istcs(X, data1, data2, freqinfo,
                                      tperseg, toverlap,
                                      basewidth=basewidth_triang)
 

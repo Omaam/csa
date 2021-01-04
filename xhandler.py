@@ -5,39 +5,9 @@ import pandas as pd
 from tqdm import tqdm
 
 from signiftest import LagSignifTest
+from csa import stopwatch
 
 __all__ = ['signiftest', 'query_forX']
-
-
-# wrappers
-
-def stopwatch(func):
-    def wrapper(*arg, **kargs):
-        start = time.time()
-        res = func(*arg, **kargs)
-        dura = (time.time() - start)
-        print(time.strftime(f'{func.__name__} %H:%M\'%S\"',
-                            time.gmtime(dura)))
-        return res
-    return wrapper
-
-
-def _adjuster_forX(func, X, *args, **kargs):
-    '''Container for a X.
-       By using this, it is possible to use
-       functions without taking care of the
-       shape of the X.
-    '''
-    # for cs
-    if len(X.shape) == 1:
-        X_out = func(X, *args, **kargs)
-
-    # for stcs
-    elif len(X.shape) == 2:
-        X_out = X.copy()
-        for i, x in enumerate(tqdm(X)):
-            X_out[i] = func(x, *args, **kargs)
-    return X_out
 
 
 def _get_freq(freqinfo):
@@ -204,6 +174,25 @@ def _signiftest(x, freqinfo, testrange, lagbinwidth=1,
 
 def subtractX(X_minuend, X_subtrahend):
     return X_diff
+
+
+def _adjuster_forX(func, X, *args, **kargs):
+    '''Container for a X.
+       By using this, it is possible to use
+       functions without taking care of the
+       shape of the X.
+    '''
+    # for cs
+    if len(X.shape) == 1:
+        X_out = func(X, *args, **kargs)
+
+    # for stcs
+    elif len(X.shape) == 2:
+        X_out = X.copy()
+        for i, x in enumerate(tqdm(X)):
+            X_out[i] = func(x, *args, **kargs)
+    return X_out
+
 
 # not used
 class XXX():
