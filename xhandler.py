@@ -47,6 +47,7 @@ def _get_freq(freqinfo):
     freq_vec = (freq_edge[:-1] + freq_edge[1:]) / 2
     return freq_vec
 
+
 def _limit_phase(phase_diff):
     if phase_diff < -np.pi: # phase_lag > pi
         phase_diff_out = 2*np.pi + phase_diff
@@ -55,6 +56,7 @@ def _limit_phase(phase_diff):
     else:
         phase_diff_out = phase_diff
     return phase_diff_out
+
 
 def _make_summary(x, freqinfo, anti=False):
 
@@ -79,7 +81,8 @@ def _make_summary(x, freqinfo, anti=False):
     df_x['lag'] = delta_alpha / (2 * np.pi * df_x.freq.values)
 
     # summary
-    df_sum = df_x[['lag', 'norm12', 'norm1', 'norm2', 'period', 'freq']][df_x.norm12 > 0]
+    df_sum = df_x[['lag', 'norm12', 'norm1', 'norm2',\
+                   'period', 'freq']][df_x.norm12 > 0]
     if anti:
         df_sum = _make_antisum(df_sum)
 

@@ -30,7 +30,7 @@ CV = 0
 STCS = 0
 ISTCS = 1
 
-FIGSHOW = 1
+FIGSHOW = 0
 
 # decorators
 
@@ -382,7 +382,7 @@ def main():
             plt.show()
     cvdata = np.loadtxt('./cvdata.dat')
     lam_min = _lambda_fromcvdata(cvdata, mode='min')
-    print(f'lam_min = {lam_min}')
+    print(f'lam_min = {lam_min:.3f}')
 
     # short-time common signal analysis
     if STCS:
