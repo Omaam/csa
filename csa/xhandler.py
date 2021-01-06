@@ -4,8 +4,8 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-from .signiftest import LagSignifTest
-from .deco import stopwatch
+from signiftest import LagSignifTest
+from deco import stopwatch
 
 
 __all__ = ['signiftest', 'query_forX']

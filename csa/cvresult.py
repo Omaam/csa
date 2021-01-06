@@ -3,7 +3,6 @@ import matplotlib.pyplot as plt
 from scipy import interpolate
 
 
-
 def lambda_fromcvdata(cvdata, mode='min'):
     spl = interpolate.interp1d(cvdata[:,0], cvdata[:,1], kind="cubic")
     lambdas = np.logspace(np.log10(cvdata[0,0]),

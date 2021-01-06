@@ -13,13 +13,13 @@ from scipy import interpolate
 from sklearn.model_selection import KFold
 from tqdm import tqdm, trange
 
-from .make_matrix import mkmat_cs, mkmat_cs_w
-from .fista import fista
-from .window_function import WindowGenerator
-from .summary_handler import SummaryNew
-from .deco import stopwatch, change_directory
-import csa.xhandler as xhan
-from .cvresult import show_cvdata, lambda_fromcvdata
+from make_matrix import mkmat_cs, mkmat_cs_w
+from fista import fista
+from window_function import WindowGenerator
+from summary_handler import SummaryNew
+from deco import stopwatch, change_directory
+import xhandler as xhan
+from cvresult import show_cvdata, lambda_fromcvdata
 
 __all__ = ['cs', 'cv', 'stcs', 'istcs']
 
