@@ -3,4 +3,4 @@ freq_up 0.5
 nfreq 2000.0
 lambda 0.8302175681319743
 tperseg 1000.0
-toverlap 980.0
+toverlap 500.0
