@@ -62,10 +62,11 @@ def _query_lightcurve(data, timerage):
     return data_out
 
 
-def _drop_sample(data, rate, seed=0):
+def _drop_sample(data, rate):
     n_data = data.shape[0]
     n_drop = int(n_data * rate)
-    index_drop = np.random.choice(n_data - 1, n_drop, replace=False)
+    index_drop = np.random.RandomState().choice(
+        n_data - 1, n_drop, replace=False)
     data_del = np.delete(data, index_drop, 0)
     return data_del
 
@@ -90,16 +91,6 @@ def _search_index(original, condition):
                                 condition)))
     return indices
 
-def _get_savename(basename: str, path_to_dir, digit=3, ext='dat'):
-    files = os.listdir(path_to_dir)
-    for i in range(10**(digit)):
-        suffix = str(i).rjust(digit, '0')
-        search_file = basename + suffix + '.' + ext
-        if (search_file in files) is False:
-            return outname
-            break
-    return outname
-
 
 # main functions; cs, cv stcs istcs
 def cs(data1, data2, freqinfo, lam):
@@ -107,7 +98,12 @@ def cs(data1, data2, freqinfo, lam):
     return freqs, x
 
 
-def _cv(data1, data2, freqinfo, lam, nfold=5):
+def _cv(data1, data2, freqinfo, lam, nfold=5, droprate=None):
+
+    # drop sample
+    if droprate:
+        data1 = _drop_sample(data1, droprate)
+        data2 = _drop_sample(data2, droprate)
 
     # freq vector
     freqs = _get_frecvec(freqinfo)
@@ -135,7 +131,7 @@ def _cv(data1, data2, freqinfo, lam, nfold=5):
 
 
 @stopwatch
-def cv(data1, data2, freqinfo, lambdainfo, nfold=5):
+def cv(data1, data2, freqinfo, lambdainfo, nfold=5, droprate=None):
 
     # use window and subtract average
     data1_win = data1.copy()
@@ -157,8 +153,11 @@ def cv(data1, data2, freqinfo, lambdainfo, nfold=5):
     cvdata = np.zeros((3, lambdas.shape[0])).T
     cvdata[:,0] = lambdas
     with ProcessPoolExecutor(MAX_WORKERS) as executor:
-        futures = tqdm([executor.submit(_cv, data1=data1_win, data2=data2_win,
-                                        freqinfo=freqinfo, lam=lam)
+        futures = tqdm([executor.submit(_cv, lam=lam,
+                                        data1=data1_win,
+                                        data2=data2_win,
+                                        freqinfo=freqinfo,
+                                        droprate=droprate)
                        for lam in lambdas])
         for k, future in enumerate(futures):
             cvdata[k,1:] = future.result()
@@ -187,10 +186,8 @@ def _stcs(data1, data2, segrange, freqinfo, lam, droprate=None):
 
     # drop rows
     if droprate:
-        data1_seg_del = _drop_sample(data1_seg_win, droprate)
-        data2_seg_del = _drop_sample(data2_seg_win, droprate)
-        # data1_seg_del = _drop_sample(data1_seg_win, rate_drop, seed=11)
-        # data2_seg_del = _drop_sample(data2_seg_win, rate_drop, seed=12)
+        data1_seg_win = _drop_sample(data1_seg_win, droprate)
+        data2_seg_win = _drop_sample(data2_seg_win, droprate)
 
     # estimate
     freq, x_seg = fista(data1_seg_win, data2_seg_win, freqinfo, lam)
@@ -322,7 +319,6 @@ def main():
 
     # cross-validation
     if CV:
-        np.random.seed(2021)
         cv_sta = np.random.randint(toverlap, np.min([n1, n2]) - tperseg)
         cv_end = cv_sta + tperseg
         print(f'time range of cv: [{cv_sta}, {cv_end}]')
@@ -343,8 +339,6 @@ def main():
     if STCS:
         freqs, t, X = stcs(data1, data2, freqinfo, lam_min,
                            tperseg, toverlap, droprate=0.1)
-        filename = _get_savename('X', 'Xs')
-        np.savetxt(filename, X)
 
     # inverse short-time common signal analysis
     if ISTCS:
@@ -360,10 +354,6 @@ def main():
         y1_rec, y2_rec = istcs(X, data1, data2, freqinfo,
                                tperseg, toverlap,
                                basewidth=basewidth_triang)
-        fname_y1 = _get_savename('y1', 'reclcs')
-        np.savetxt(filename, y1_rec)
-        fname_y2 = _get_savename('y2', 'reclcs')
-        np.savetxt(filename, y2_rec)
         # data1_lag, data2_lag = istcs(X_lag, data1, data2, freqinfo,
         #                              tperseg, toverlap,
         #                              basewidth=basewidth_triang)
