@@ -12,7 +12,7 @@ import scipy.stats as stats
 import seaborn as sns; sns.set()
 sns.set_style("whitegrid")
 
-from .signiftest import LagSignifTest
+from signiftest import LagSignifTest
 
 __all__ = ['read_summary']
 
