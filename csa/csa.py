@@ -13,13 +13,13 @@ from scipy import interpolate
 from sklearn.model_selection import KFold
 from tqdm import tqdm, trange
 
-from make_matrix import mkmat_cs, mkmat_cs_w
-from fista import fista
-from window_function import WindowGenerator
-from summary_handler import SummaryNew
-from deco import stopwatch, change_directory
-import xhandler as xhan
-from cvresult import show_cvdata, lambda_fromcvdata
+from .make_matrix import mkmat_cs, mkmat_cs_w
+from .fista import fista
+from .window_function import WindowGenerator
+from .summary_handler import SummaryNew
+from .deco import stopwatch, change_directory
+import csa.xhandler as xhan
+from .cvresult import show_cvdata, lambda_fromcvdata
 
 __all__ = ['cs', 'cv', 'stcs', 'istcs']
 
@@ -30,32 +30,6 @@ STCS = 1
 ISTCS = 1
 
 FIGSHOW = 1
-
-
-def stopwatch(func):
-    def wrapper(*arg, **kargs):
-        start = time.time()
-        print(f'start {func.__name__}')
-        res = func(*arg, **kargs)
-        dura = (time.time() - start)
-        print(time.strftime(f'finish {func.__name__}: %H:%M\'%S\"',
-                            time.gmtime(dura)))
-        return res
-    return wrapper
-
-
-def change_directory(path_to_dir):
-    def _change_directory(func):
-        def wrapper(*args, **kargs):
-            current_dir = os.getcwd()
-            if os.path.exists(path_to_dir) is False:
-                os.makedirs(path_to_dir)
-            os.chdir(path_to_dir)
-            results = func(*args, **kargs)
-            os.chdir(current_dir)
-            return(results)
-        return wrapper
-    return _change_directory
 
 
 # functions for csa
@@ -115,6 +89,16 @@ def _search_index(original, condition):
     indices = np.array(list(map(lambda a: l.index(a),
                                 condition)))
     return indices
+
+def _get_savename(basename: str, path_to_dir, digit=3, ext='dat'):
+    files = os.listdir(path_to_dir)
+    for i in range(10**(digit)):
+        suffix = str(i).rjust(digit, '0')
+        search_file = basename + suffix + '.' + ext
+        if (search_file in files) is False:
+            return outname
+            break
+    return outname
 
 
 # main functions; cs, cv stcs istcs
@@ -203,8 +187,8 @@ def _stcs(data1, data2, segrange, freqinfo, lam, droprate=None):
 
     # drop rows
     if droprate:
-        data1_seg_del = _drop_sample(data1_seg_win, rate_drop)
-        data2_seg_del = _drop_sample(data2_seg_win, rate_drop)
+        data1_seg_del = _drop_sample(data1_seg_win, droprate)
+        data2_seg_del = _drop_sample(data2_seg_win, droprate)
         # data1_seg_del = _drop_sample(data1_seg_win, rate_drop, seed=11)
         # data2_seg_del = _drop_sample(data2_seg_win, rate_drop, seed=12)
 
@@ -214,7 +198,7 @@ def _stcs(data1, data2, segrange, freqinfo, lam, droprate=None):
 
 @stopwatch
 def stcs(data1, data2, freqinfo, lam, tperseg, toverlap,
-         window='hann', x_name='X.dat'):
+         window='hann', x_name='X.dat', droprate=None):
 
     # calucurate segranges
     t_min, t_max = _get_minmax(data1[:,0], data2[:,0])
@@ -240,7 +224,7 @@ def stcs(data1, data2, freqinfo, lam, tperseg, toverlap,
         futures = tqdm([executor.submit(_stcs, segrange=segrange,
                                         data1=data1, data2=data2,
                                         freqinfo=freqinfo,
-                                        lam=lam)
+                                        lam=lam, droprate=droprate)
                        for segrange in segranges])
         for i, future in enumerate(futures):
             X[:,i] = future.result()
@@ -292,10 +276,10 @@ def istcs(X, data1, data2, freqinfo, tperseg, toverlap, **winargs):
     segranges = _segment_time(t_min, t_max, tperseg, toverlap)
 
     # prepare ndarray for reconstraction
-    data1_rec = data1.copy()
-    data2_rec = data2.copy()
-    data1_rec[:,1] = np.zeros(data1.shape[0])
-    data2_rec[:,1] = np.zeros(data2.shape[0])
+    y1_rec = data1.copy()
+    y2_rec = data2.copy()
+    y1_rec[:,1] = np.zeros(data1.shape[0])
+    y2_rec[:,1] = np.zeros(data2.shape[0])
 
     with ProcessPoolExecutor(MAX_WORKERS) as executor:
         need_sect = (tperseg - toverlap) * 1
@@ -313,12 +297,12 @@ def istcs(X, data1, data2, freqinfo, tperseg, toverlap, **winargs):
             indices_t2 = _search_index(data2[:,0], data2_seg_out[:,0])
 
             # add results
-            data1_rec[indices_t1, 1] = data1_rec[indices_t1, 1] \
+            y1_rec[indices_t1, 1] = y1_rec[indices_t1, 1] \
                                      + data1_seg_out[:,1]
-            data2_rec[indices_t2, 1] = data2_rec[indices_t2, 1] \
+            y2_rec[indices_t2, 1] = y2_rec[indices_t2, 1] \
                                      + data2_seg_out[:,1]
 
-    return data1_rec, data2_rec
+    return y1_rec, y2_rec
 
 
 @change_directory('../example')
@@ -358,7 +342,9 @@ def main():
     # short-time common signal analysis
     if STCS:
         freqs, t, X = stcs(data1, data2, freqinfo, lam_min,
-                           tperseg, toverlap)
+                           tperseg, toverlap, droprate=0.1)
+        filename = _get_savename('X', 'Xs')
+        np.savetxt(filename, X)
 
     # inverse short-time common signal analysis
     if ISTCS:
@@ -366,31 +352,35 @@ def main():
         print(X.shape)
 
         # query lag comp. around true lag
-        X_lag = xhan.signiftest(X, freqinfo, testrange=[-10, 10])
-        X_lag = xhan.query_forX(X, freqinfo, 'lag', [3, 5])
-        X_rem = xhan.subtractX(X, X_lag)
+        # X_lag = xhan.signiftest(X, freqinfo, testrange=[-10, 10])
+        # X_lag = xhan.query_forX(X, freqinfo, 'lag', [3, 5])
+        # X_rem = xhan.subtractX(X, X_lag)
 
         # istcs
-        data1_rec, data2_rec = istcs(X, data1, data2, freqinfo,
-                                     tperseg, toverlap,
-                                     basewidth=basewidth_triang)
-        data1_lag, data2_lag = istcs(X_lag, data1, data2, freqinfo,
-                                     tperseg, toverlap,
-                                     basewidth=basewidth_triang)
-        data1_rem, data2_rem = istcs(X_rem, data1, data2, freqinfo,
-                                     tperseg, toverlap,
-                                     basewidth=basewidth_triang)
+        y1_rec, y2_rec = istcs(X, data1, data2, freqinfo,
+                               tperseg, toverlap,
+                               basewidth=basewidth_triang)
+        fname_y1 = _get_savename('y1', 'reclcs')
+        np.savetxt(filename, y1_rec)
+        fname_y2 = _get_savename('y2', 'reclcs')
+        np.savetxt(filename, y2_rec)
+        # data1_lag, data2_lag = istcs(X_lag, data1, data2, freqinfo,
+        #                              tperseg, toverlap,
+        #                              basewidth=basewidth_triang)
+        # data1_rem, data2_rem = istcs(X_rem, data1, data2, freqinfo,
+        #                              tperseg, toverlap,
+        #                              basewidth=basewidth_triang)
 
         # figure
         fig, ax = plt.subplots(2, sharex=True)
         ax[0].plot(data2[:,0], data2[:,1],
-                   data2_rec[:,0], data2_rec[:,1],
+                   y2_rec[:,0], y2_rec[:,1],
                    data2_lag[:,0], data2_lag[:,1],
                    data2_rem[:,0], data2_rem[:,1],)
         ax[0].set_ylabel('Optical flux')
         ax[0].legend(['original', 'istcs', 'lag', 'rem'])
         ax[1].plot(data1[:,0], data1[:,1],
-                   data1_rec[:,0], data1_rec[:,1],
+                   y1_rec[:,0], y1_rec[:,1],
                    data1_lag[:,0], data1_lag[:,1],
                    data1_rem[:,0], data1_rem[:,1],)
         ax[1].set_ylabel('X-ray flux')
