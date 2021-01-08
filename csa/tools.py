@@ -25,6 +25,26 @@ def _limit_phase(phase_diff):
     return phase_diff_out
 
 
+def segment_time(t_sta, t_end, tperseg, toverlap):
+    # set constant
+    tstep = tperseg - toverlap
+    nstep = (t_end - t_sta - tperseg) // tstep + 2
+
+    # calcurate edge of lefts and rights
+    edge_left = t_sta + np.arange(nstep)*tstep
+    edge_right = t_sta + tperseg + np.arange(nstep)*tstep
+
+    # concat edges
+    segranges = np.array(list(zip(edge_left, edge_right)))
+    return segranges
+
+
+def query_lightcurve(data, timerage):
+    data_out = data[np.where((timerage[0] <= data[:,0]) &\
+                              (data[:,0] < timerage[1]))]
+    return data_out
+
+
 def make_summary(x, freqinfo, anti=False):
 
     # x

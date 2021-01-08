@@ -58,7 +58,8 @@ def _complement_index(ind):
 
 
 def _query_lightcurve(data, timerage):
-    data_out = data[np.where((timerage[0] <= data[:,0]) & (data[:,0] < timerage[1]))]
+    data_out = data[np.where((timerage[0] <= data[:,0]) &\
+                              (data[:,0] < timerage[1]))]
     return data_out
 
 
@@ -147,7 +148,7 @@ def cv(data1, data2, freqinfo, lambdainfo, nfold=5, droprate=None):
     lambdas = np.logspace(np.log10(lambdainfo[0]),
                           np.log10(lambdainfo[1]),
                           lambdainfo[2])
-    print('lambdas:\n{}'.format(lambdas))
+    # print('lambdas:\n{}'.format(lambdas))
 
     # cross-validation with multi process
     cvdata = np.zeros((3, lambdas.shape[0])).T

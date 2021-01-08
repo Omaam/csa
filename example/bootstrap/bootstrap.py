@@ -120,7 +120,6 @@ def main():
             plt.plot(t1, y1, alpha=.3)
         plt.show()
 
-        fs = 1
         lags, c_low, c_med, c_hig = ccfbootstrap(Y1, Y2, maxlags=200)
         plt.fill_between(lags, c_low, c_hig, alpha=.5)
         plt.plot(lags, c_med)
