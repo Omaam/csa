@@ -13,13 +13,13 @@ from scipy import interpolate
 from sklearn.model_selection import KFold
 from tqdm import tqdm, trange
 
-from make_matrix import mkmat_cs, mkmat_cs_w
-from fista import fista
-from window_function import WindowGenerator
-from summary_handler import SummaryNew
-from deco import stopwatch, change_directory
-import xhandler as xhan
-from cvresult import show_cvdata, lambda_fromcvdata
+from csa.make_matrix import mkmat_cs, mkmat_cs_w
+from csa.fista import fista
+from csa.window_function import WindowGenerator
+from csa.summary_handler import SummaryNew
+from csa.deco import stopwatch, change_directory
+import csa.xhandler as xhan
+from csa.cvresult import show_cvdata, lambda_fromcvdata
 
 __all__ = ['cs', 'cv', 'stcs', 'istcs']
 
@@ -177,12 +177,12 @@ def _stcs(data1, data2, segrange, freqinfo, lam, droprate=None):
     # use window fuction
     window = WindowGenerator(segrange)
     window.hann()
-    # data1_seg_win[:,1] = _sub_ave(data1_seg[:,1]) * window.gene(data1_seg[:,0])
-    # data2_seg_win[:,1] = _sub_ave(data2_seg[:,1]) * window.gene(data2_seg[:,0])
-    data1_seg_win[:,1] = data1_seg[:,1] * window.gene(data1_seg[:,0])
-    data2_seg_win[:,1] = data2_seg[:,1] * window.gene(data2_seg[:,0])
-    acf = window.acf
-    ecf = window.ecf
+    data1_seg_win[:,1] = _sub_ave(data1_seg[:,1]) * window.gene(data1_seg[:,0])
+    data2_seg_win[:,1] = _sub_ave(data2_seg[:,1]) * window.gene(data2_seg[:,0])
+    # data1_seg_win[:,1] = data1_seg[:,1] * window.gene(data1_seg[:,0])
+    # data2_seg_win[:,1] = data2_seg[:,1] * window.gene(data2_seg[:,0])
+    # acf = window.acf
+    # ecf = window.ecf
 
     # drop rows
     if droprate:
@@ -249,8 +249,9 @@ def _istcs(x, segrange, data1, data2, freqinfo, need_sect, **winargs):
     # reconstruct
     window = WindowGenerator(segrange)
     window.triang(winargs['winargs']['basewidth'])
-    wy1 = window.gene(data1_seg[:,0]) * y1
-    wy2 = window.gene(data2_seg[:,0]) * y2
+    print(segrange, data1_seg[:,1].mean())
+    wy1 = window.gene(data1_seg[:,0])*(y1+ data1_seg[:,1].mean())
+    wy2 = window.gene(data2_seg[:,0])*(y2 + data2_seg[:,1].mean())
 
     # substitution; to conserve energy, it is divided by
     # Energy Correction Factor (ECF)
@@ -307,7 +308,7 @@ def main():
 
     # constant
     tperseg = 1000
-    toverlap = 980
+    toverlap = 500
     basewidth_triang = 2*(tperseg - toverlap)
 
     # load data
@@ -338,7 +339,7 @@ def main():
     # short-time common signal analysis
     if STCS:
         freqs, t, X = stcs(data1, data2, freqinfo, lam_min,
-                           tperseg, toverlap, droprate=0.1)
+                           tperseg, toverlap, droprate=None)
         np.savetxt('time.dat', t)
         np.savetxt('freq.dat', freqs)
 
@@ -349,33 +350,33 @@ def main():
         print(X.shape)
 
         # query lag comp. around true lag
-        X_lag = xhan.signiftest(X, freqinfo, testrange=[-10, 10])
-        X_lag = xhan.query_forX(X, freqinfo, 'lag', [3, 5])
-        X_rem = xhan.subtractX(X, X_lag)
+        # X_lag = xhan.signiftest(X, freqinfo, testrange=[-10, 10])
+        # X_lag = xhan.query_forX(X, freqinfo, 'lag', [3, 5])
+        # X_rem = xhan.subtractX(X, X_lag)
 
         # istcs
         y1_rec, y2_rec = istcs(X, data1, data2, freqinfo,
                                tperseg, toverlap,
                                basewidth=basewidth_triang)
-        data1_lag, data2_lag = istcs(X_lag, data1, data2, freqinfo,
-                                     tperseg, toverlap,
-                                     basewidth=basewidth_triang)
-        data1_rem, data2_rem = istcs(X_rem, data1, data2, freqinfo,
-                                     tperseg, toverlap,
-                                     basewidth=basewidth_triang)
+        # data1_lag, data2_lag = istcs(X_lag, data1, data2, freqinfo,
+        #                              tperseg, toverlap,
+        #                              basewidth=basewidth_triang)
+        # data1_rem, data2_rem = istcs(X_rem, data1, data2, freqinfo,
+        #                              tperseg, toverlap,
+        #                              basewidth=basewidth_triang)
 
         # figure
         fig, ax = plt.subplots(2, sharex=True)
         ax[0].plot(data2[:,0], data2[:,1],
-                   y2_rec[:,0], y2_rec[:,1],
-                   data2_lag[:,0], data2_lag[:,1],
-                   data2_rem[:,0], data2_rem[:,1],)
+                   y2_rec[:,0], y2_rec[:,1],)
+                   # data2_lag[:,0], data2_lag[:,1],
+                   # data2_rem[:,0], data2_rem[:,1],)
         ax[0].set_ylabel('Optical flux')
         ax[0].legend(['original', 'istcs', 'lag', 'rem'])
         ax[1].plot(data1[:,0], data1[:,1],
-                   y1_rec[:,0], y1_rec[:,1],
-                   data1_lag[:,0], data1_lag[:,1],
-                   data1_rem[:,0], data1_rem[:,1],)
+                   y1_rec[:,0], y1_rec[:,1],)
+                   # data1_lag[:,0], data1_lag[:,1],
+                   # data1_rem[:,0], data1_rem[:,1],)
         ax[1].set_ylabel('X-ray flux')
         ax[1].set_xlabel('Time')
         fig.savefig('lc_ncf_noavesub.png')
