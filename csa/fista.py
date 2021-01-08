@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from make_matrix import mkmat_cs, mkmat_cs_w
+from csa.make_matrix import mkmat_cs, mkmat_cs_w
 
 
 def soft_thres(a, b, c, d, L, lam):

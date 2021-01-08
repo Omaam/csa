@@ -4,8 +4,8 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-from signiftest import LagSignifTest
-from deco import stopwatch
+from .signiftest import LagSignifTest
+from .deco import stopwatch
 
 
 __all__ = ['signiftest', 'query_forX']
@@ -179,37 +179,6 @@ def subtractX(X_minuend, X_subtrahend):
     return X_diff
 
 
-def _lagmap(x, freqinfo, bins=10, range=None):
-
-    # make sumarry
-    df_sum = _make_summary(x, freqinfo)
-
-    # get values
-    lags = df_sum.lag
-    norms = df_sum.norm12
-
-    # get edges
-    bin_edges = np.histogram_bin_edges(lags, bins=bins, range=range)
-
-    # get index which each value belongs to
-    inds = np.digitize(lags, bin_edges) - 1
-
-    # add each power
-    powsums = np.zeros(len(bin_edges)-1)
-    for ind in np.arange(len(powsums)):
-        powsums[ind] = norms[inds == ind].sum()
-
-    import matplotlib.pyplot as plt
-    plt.bar(bin_edges[:-1], powsums, width=np.diff(bin_edges).mean(), align='edge')
-    plt.show()
-    print(bin_edges, powsums)
-    return bin_edges, powsums
-
-
-def lagmap(X, freqinfo, bins=10, range=None):
-    X_out = _adjuster_forX(_lagmap, X, freqinfo=freqinfo,
-                                    bins=bins, range=range)
-    return X_out
 
 
 def _adjuster_forX(func, X, *args, **kargs):

@@ -4,8 +4,6 @@ import os
 ncpu = os.cpu_count()
 MAX_WORKERS = ncpu
 print(f'number of cpu: {ncpu}')
-import sys
-sys.path.append('summary_handler')
 
 import numpy as np
 import pandas as pd
@@ -19,8 +17,9 @@ from make_matrix import mkmat_cs, mkmat_cs_w
 from fista import fista
 from window_function import WindowGenerator
 from summary_handler import SummaryNew
+from deco import stopwatch, change_directory
 import xhandler as xhan
-
+from cvresult import show_cvdata, lambda_fromcvdata
 
 __all__ = ['cs', 'cv', 'stcs', 'istcs']
 
@@ -31,32 +30,6 @@ STCS = 1
 ISTCS = 1
 
 FIGSHOW = 1
-
-
-def stopwatch(func):
-    def wrapper(*arg, **kargs):
-        start = time.time()
-        print(f'start {func.__name__}')
-        res = func(*arg, **kargs)
-        dura = (time.time() - start)
-        print(time.strftime(f'finish {func.__name__}: %H:%M\'%S\"',
-                            time.gmtime(dura)))
-        return res
-    return wrapper
-
-
-def change_directory(path_to_dir):
-    def _change_directory(func):
-        def wrapper(*args, **kargs):
-            current_dir = os.getcwd()
-            if os.path.exists(path_to_dir) is False:
-                os.makedirs(path_to_dir)
-            os.chdir(path_to_dir)
-            results = func(*args, **kargs)
-            os.chdir(current_dir)
-            return(results)
-        return wrapper
-    return _change_directory
 
 
 # functions for csa
@@ -89,10 +62,11 @@ def _query_lightcurve(data, timerage):
     return data_out
 
 
-def _drop_sample(data, rate, seed=0):
+def _drop_sample(data, rate):
     n_data = data.shape[0]
     n_drop = int(n_data * rate)
-    index_drop = np.random.choice(n_data - 1, n_drop, replace=False)
+    index_drop = np.random.RandomState().choice(
+        n_data - 1, n_drop, replace=False)
     data_del = np.delete(data, index_drop, 0)
     return data_del
 
@@ -117,36 +91,19 @@ def _search_index(original, condition):
                                 condition)))
     return indices
 
-def _lambda_fromcvdata(cvdata, mode='min'):
-    spl = interpolate.interp1d(cvdata[:,0], cvdata[:,1], kind="cubic")
-    lambdas = np.logspace(np.log10(cvdata[0,0]),
-                          np.log10(cvdata[-1,0]), 100)
-    idx_min = spl(lambdas).argmin()
-
-    if mode == 'min':
-        return lambdas[idx_min]
-
-    elif mode == 'ose':
-        idx_min_data = cvdata[:,1].argmin()
-        mse_p_std_min = cvdata[idx_min_data,1:].sum()
-        lambdas_aftermin = lambdas[idx_min:].copy()
-        idx_ose = np.searchsorted(spl(lambdas[idx_min:]), mse_p_std_min)
-        return lambdas[idx_min + idx_ose]
-
 
 # main functions; cs, cv stcs istcs
-def cs(infile1, infile2, freqinfo, lam):
-
-    # load infile
-    data1 = np.loadtxt(infile1)
-    data2 = np.loadtxt(infile2)
-    print('data1: {}'.format(data1.shape))
-    print('data2: {}'.format(data2.shape))
-
-    return fista(data1, data2, freqinfo, lam)
+def cs(data1, data2, freqinfo, lam):
+    freqs, x = fista(data1, data2, freqinfo, lam)
+    return freqs, x
 
 
-def _cv(data1, data2, freqinfo, lam, nfold=5):
+def _cv(data1, data2, freqinfo, lam, nfold=5, droprate=None):
+
+    # drop sample
+    if droprate:
+        data1 = _drop_sample(data1, droprate)
+        data2 = _drop_sample(data2, droprate)
 
     # freq vector
     freqs = _get_frecvec(freqinfo)
@@ -174,7 +131,7 @@ def _cv(data1, data2, freqinfo, lam, nfold=5):
 
 
 @stopwatch
-def cv(data1, data2, freqinfo, lambdainfo, nfold=5):
+def cv(data1, data2, freqinfo, lambdainfo, nfold=5, droprate=None):
 
     # use window and subtract average
     data1_win = data1.copy()
@@ -196,8 +153,11 @@ def cv(data1, data2, freqinfo, lambdainfo, nfold=5):
     cvdata = np.zeros((3, lambdas.shape[0])).T
     cvdata[:,0] = lambdas
     with ProcessPoolExecutor(MAX_WORKERS) as executor:
-        futures = tqdm([executor.submit(_cv, data1=data1_win, data2=data2_win,
-                                        freqinfo=freqinfo, lam=lam)
+        futures = tqdm([executor.submit(_cv, lam=lam,
+                                        data1=data1_win,
+                                        data2=data2_win,
+                                        freqinfo=freqinfo,
+                                        droprate=droprate)
                        for lam in lambdas])
         for k, future in enumerate(futures):
             cvdata[k,1:] = future.result()
@@ -217,8 +177,8 @@ def _stcs(data1, data2, segrange, freqinfo, lam, droprate=None):
     # use window fuction
     window = WindowGenerator(segrange)
     window.hann()
-    data1_seg_win[:,1] = _sub_ave(data1_seg[:,1]) * window.gene(data1_seg[:,0])
-    data2_seg_win[:,1] = _sub_ave(data2_seg[:,1]) * window.gene(data2_seg[:,0])
+    # data1_seg_win[:,1] = _sub_ave(data1_seg[:,1]) * window.gene(data1_seg[:,0])
+    # data2_seg_win[:,1] = _sub_ave(data2_seg[:,1]) * window.gene(data2_seg[:,0])
     data1_seg_win[:,1] = data1_seg[:,1] * window.gene(data1_seg[:,0])
     data2_seg_win[:,1] = data2_seg[:,1] * window.gene(data2_seg[:,0])
     acf = window.acf
@@ -226,19 +186,16 @@ def _stcs(data1, data2, segrange, freqinfo, lam, droprate=None):
 
     # drop rows
     if droprate:
-        data1_seg_del = _drop_sample(data1_seg_win, rate_drop)
-        data2_seg_del = _drop_sample(data2_seg_win, rate_drop)
-        # data1_seg_del = _drop_sample(data1_seg_win, rate_drop, seed=11)
-        # data2_seg_del = _drop_sample(data2_seg_win, rate_drop, seed=12)
+        data1_seg_win = _drop_sample(data1_seg_win, droprate)
+        data2_seg_win = _drop_sample(data2_seg_win, droprate)
 
     # estimate
     freq, x_seg = fista(data1_seg_win, data2_seg_win, freqinfo, lam)
-    # print(f'finish {segrange}')
     return x_seg
 
 @stopwatch
 def stcs(data1, data2, freqinfo, lam, tperseg, toverlap,
-         window='hann', x_name='X.dat'):
+         window='hann', x_name='X.dat', droprate=None):
 
     # calucurate segranges
     t_min, t_max = _get_minmax(data1[:,0], data2[:,0])
@@ -264,7 +221,7 @@ def stcs(data1, data2, freqinfo, lam, tperseg, toverlap,
         futures = tqdm([executor.submit(_stcs, segrange=segrange,
                                         data1=data1, data2=data2,
                                         freqinfo=freqinfo,
-                                        lam=lam)
+                                        lam=lam, droprate=droprate)
                        for segrange in segranges])
         for i, future in enumerate(futures):
             X[:,i] = future.result()
@@ -316,10 +273,10 @@ def istcs(X, data1, data2, freqinfo, tperseg, toverlap, **winargs):
     segranges = _segment_time(t_min, t_max, tperseg, toverlap)
 
     # prepare ndarray for reconstraction
-    data1_rec = data1.copy()
-    data2_rec = data2.copy()
-    data1_rec[:,1] = np.zeros(data1.shape[0])
-    data2_rec[:,1] = np.zeros(data2.shape[0])
+    y1_rec = data1.copy()
+    y2_rec = data2.copy()
+    y1_rec[:,1] = np.zeros(data1.shape[0])
+    y2_rec[:,1] = np.zeros(data2.shape[0])
 
     with ProcessPoolExecutor(MAX_WORKERS) as executor:
         need_sect = (tperseg - toverlap) * 1
@@ -337,20 +294,20 @@ def istcs(X, data1, data2, freqinfo, tperseg, toverlap, **winargs):
             indices_t2 = _search_index(data2[:,0], data2_seg_out[:,0])
 
             # add results
-            data1_rec[indices_t1, 1] = data1_rec[indices_t1, 1] \
+            y1_rec[indices_t1, 1] = y1_rec[indices_t1, 1] \
                                      + data1_seg_out[:,1]
-            data2_rec[indices_t2, 1] = data2_rec[indices_t2, 1] \
+            y2_rec[indices_t2, 1] = y2_rec[indices_t2, 1] \
                                      + data2_seg_out[:,1]
 
-    return data1_rec, data2_rec
+    return y1_rec, y2_rec
 
 
-@change_directory('example')
+@change_directory('../example')
 def main():
 
     # constant
     tperseg = 1000
-    toverlap = 950
+    toverlap = 980
     basewidth_triang = 2*(tperseg - toverlap)
 
     # load data
@@ -362,7 +319,6 @@ def main():
 
     # cross-validation
     if CV:
-        np.random.seed(2021)
         cv_sta = np.random.randint(toverlap, np.min([n1, n2]) - tperseg)
         cv_end = cv_sta + tperseg
         print(f'time range of cv: [{cv_sta}, {cv_end}]')
@@ -371,26 +327,21 @@ def main():
         np.savetxt('cvdata.dat', cvdata)
 
         # plot cvdata
-        lambdas = np.logspace(np.log10(cvdata[0,0]),
-                              np.log10(cvdata[-1,0]), 100)
-        f = interpolate.interp1d(cvdata[:,0], cvdata[:,1], kind="cubic")
-        plt.plot(lambdas, f(lambdas), linestyle=':')
-        plt.errorbar(cvdata[:,0], cvdata[:,1], cvdata[:,2], fmt='o')
-        plt.xscale('log')
-        plt.yscale('log')
-        plt.xlabel(r'$\lambda$')
-        plt.ylabel('MSE')
+        show_cvdata(cvdata)
         plt.savefig('cvcurve.png')
         if FIGSHOW:
             plt.show()
     cvdata = np.loadtxt('./cvdata.dat')
-    lam_min = _lambda_fromcvdata(cvdata, mode='min')
+    lam_min = lambda_fromcvdata(cvdata, mode='min')
     print(f'lam_min = {lam_min:.3f}')
 
     # short-time common signal analysis
     if STCS:
         freqs, t, X = stcs(data1, data2, freqinfo, lam_min,
-                           tperseg, toverlap)
+                           tperseg, toverlap, droprate=0.1)
+        np.savetxt('time.dat', t)
+        np.savetxt('freq.dat', freqs)
+
 
     # inverse short-time common signal analysis
     if ISTCS:
@@ -398,36 +349,36 @@ def main():
         print(X.shape)
 
         # query lag comp. around true lag
-        # X_lag = xhan.signiftest(X, freqinfo, testrange=[-10, 10])
-        # X_lag = xhan.query_forX(X, freqinfo, 'lag', [3, 5])
-        # X_rem = xhan.subtractX(X, X_lag)
+        X_lag = xhan.signiftest(X, freqinfo, testrange=[-10, 10])
+        X_lag = xhan.query_forX(X, freqinfo, 'lag', [3, 5])
+        X_rem = xhan.subtractX(X, X_lag)
 
         # istcs
-        data1_rec, data2_rec = istcs(X, data1, data2, freqinfo,
+        y1_rec, y2_rec = istcs(X, data1, data2, freqinfo,
+                               tperseg, toverlap,
+                               basewidth=basewidth_triang)
+        data1_lag, data2_lag = istcs(X_lag, data1, data2, freqinfo,
                                      tperseg, toverlap,
                                      basewidth=basewidth_triang)
-        # data1_lag, data2_lag = istcs(X_lag, data1, data2, freqinfo,
-        #                              tperseg, toverlap,
-        #                              basewidth=basewidth_triang)
-        # data1_rem, data2_rem = istcs(X_rem, data1, data2, freqinfo,
-        #                              tperseg, toverlap,
-        #                              basewidth=basewidth_triang)
+        data1_rem, data2_rem = istcs(X_rem, data1, data2, freqinfo,
+                                     tperseg, toverlap,
+                                     basewidth=basewidth_triang)
 
         # figure
         fig, ax = plt.subplots(2, sharex=True)
         ax[0].plot(data2[:,0], data2[:,1],
-                   data2_rec[:,0], data2_rec[:,1],)
-                   # data2_lag[:,0], data2_lag[:,1],
-                   # data2_rem[:,0], data2_rem[:,1],)
+                   y2_rec[:,0], y2_rec[:,1],
+                   data2_lag[:,0], data2_lag[:,1],
+                   data2_rem[:,0], data2_rem[:,1],)
         ax[0].set_ylabel('Optical flux')
         ax[0].legend(['original', 'istcs', 'lag', 'rem'])
         ax[1].plot(data1[:,0], data1[:,1],
-                   data1_rec[:,0], data1_rec[:,1],)
-                   # data1_lag[:,0], data1_lag[:,1],
-                   # data1_rem[:,0], data1_rem[:,1],)
+                   y1_rec[:,0], y1_rec[:,1],
+                   data1_lag[:,0], data1_lag[:,1],
+                   data1_rem[:,0], data1_rem[:,1],)
         ax[1].set_ylabel('X-ray flux')
         ax[1].set_xlabel('Time')
-        # fig.savefig('lc_ncf_noavesub.png')
+        fig.savefig('lc_ncf_noavesub.png')
         if FIGSHOW:
             plt.show()
 
