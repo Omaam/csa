@@ -10,8 +10,8 @@ from ccfbootstrap import ccfbootstrap
 
 
 # analysis option
-CV = 1
-STCS = 1
+CV = 0
+STCS = 0
 ISTCS = 1
 
 CCF = 1

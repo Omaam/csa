@@ -179,6 +179,39 @@ def subtractX(X_minuend, X_subtrahend):
     return X_diff
 
 
+def _lagmap(x, freqinfo, bins=10, range=None):
+
+    # make sumarry
+    df_sum = _make_summary(x, freqinfo)
+
+    # get values
+    lags = df_sum.lag
+    norms = df_sum.norm12
+
+    # get edges
+    bin_edges = np.histogram_bin_edges(lags, bins=bins, range=range)
+
+    # get index which each value belongs to
+    inds = np.digitize(lags, bin_edges) - 1
+
+    # add each power
+    powsums = np.zeros(len(bin_edges)-1)
+    for ind in np.arange(len(powsums)):
+        powsums[ind] = norms[inds == ind].sum()
+
+    import matplotlib.pyplot as plt
+    plt.bar(bin_edges[:-1], powsums, width=np.diff(bin_edges).mean(), align='edge')
+    plt.show()
+    print(bin_edges, powsums)
+    return bin_edges, powsums
+
+
+def lagmap(X, freqinfo, bins=10, range=None):
+    X_out = _adjuster_forX(_lagmap, X, freqinfo=freqinfo,
+                                    bins=bins, range=range)
+    return X_out
+
+
 def _adjuster_forX(func, X, *args, **kargs):
     '''Adjuster for a X.
        By using this, it is possible to use
@@ -196,35 +229,14 @@ def _adjuster_forX(func, X, *args, **kargs):
     return X_out
 
 
-# not used
-class XXX():
-
-    def __init__(self, x, freqinfo):
-
-        # basic attribution
-        self.x = x
-        self.freq = _get_freq(freqinfo)
-        nfreq = freqinfo[2]
-        self.nfreq = nfreq
-        self.df_x = x.reshape(freqinfo[2], 4)
-        self.summary = _make_summary(x, freqinfo)
-        self.summary_anti = _make_summary(x, freqinfo, anti=True)
-        self.freqinfo = freqinfo
-
-    def __repr__(self):
-        return repr(self.df_x)
-
-    def pred(self, t):
-        y = 2*t
-        return y
-
-
 def main():
     freqinfo = [0, 0.5, 2000]
-    X = np.loadtxt('example/X.dat')
-    x = X[0]
+    X = np.loadtxt('../example/X.dat')
     testrange = [-10, 10]
-    x_cut = query_forX(x, freqinfo, 'lag', [-2, 2], 'cut')
+    lags, powsums = lagmap(X, freqinfo, range=[-10,10])
+    print(lags, powsums)
+
+    x_cut = query_forX(X, freqinfo, 'lag', [-2, 2], 'cut')
     print(_make_summary(x_cut, freqinfo))
     x_signif = signiftest(x_cut, freqinfo, testrange, iteration=100,
                           periodic=True)

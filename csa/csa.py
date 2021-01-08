@@ -26,7 +26,7 @@ __all__ = ['cs', 'cv', 'stcs', 'istcs']
 
 # analysis option
 CV = 0
-STCS = 1
+STCS = 0
 ISTCS = 1
 
 FIGSHOW = 1
@@ -339,6 +339,17 @@ def main():
     if STCS:
         freqs, t, X = stcs(data1, data2, freqinfo, lam_min,
                            tperseg, toverlap, droprate=0.1)
+        np.savetxt('time.dat', t)
+        np.savetxt('freq.dat', freqs)
+
+    # just a play
+    # X = np.loadtxt('X.dat')
+    # t = np.loadtxt('time.dat')
+    # freqs = np.loadtxt('freq.dat')
+    # rms = lambda a: np.sqrt(np.square(np.reshape(a, (2000, 4))).sum(axis=1))
+    # P = np.apply_along_axis(rms, 0, X)
+    # plt.pcolormesh(t, freqs, P, shading='gouraud')
+    # plt.show()
 
     # inverse short-time common signal analysis
     if ISTCS:
@@ -346,20 +357,20 @@ def main():
         print(X.shape)
 
         # query lag comp. around true lag
-        # X_lag = xhan.signiftest(X, freqinfo, testrange=[-10, 10])
-        # X_lag = xhan.query_forX(X, freqinfo, 'lag', [3, 5])
-        # X_rem = xhan.subtractX(X, X_lag)
+        X_lag = xhan.signiftest(X, freqinfo, testrange=[-10, 10])
+        X_lag = xhan.query_forX(X, freqinfo, 'lag', [3, 5])
+        X_rem = xhan.subtractX(X, X_lag)
 
         # istcs
         y1_rec, y2_rec = istcs(X, data1, data2, freqinfo,
                                tperseg, toverlap,
                                basewidth=basewidth_triang)
-        # data1_lag, data2_lag = istcs(X_lag, data1, data2, freqinfo,
-        #                              tperseg, toverlap,
-        #                              basewidth=basewidth_triang)
-        # data1_rem, data2_rem = istcs(X_rem, data1, data2, freqinfo,
-        #                              tperseg, toverlap,
-        #                              basewidth=basewidth_triang)
+        data1_lag, data2_lag = istcs(X_lag, data1, data2, freqinfo,
+                                     tperseg, toverlap,
+                                     basewidth=basewidth_triang)
+        data1_rem, data2_rem = istcs(X_rem, data1, data2, freqinfo,
+                                     tperseg, toverlap,
+                                     basewidth=basewidth_triang)
 
         # figure
         fig, ax = plt.subplots(2, sharex=True)
