@@ -132,7 +132,8 @@ def _cv(data1, data2, freqinfo, lam, nfold=5, droprate=None):
 
 
 @stopwatch
-def cv(data1, data2, freqinfo, lambdainfo, nfold=5, droprate=None):
+def cv(data1, data2, freqinfo, lambdainfo, nfold=5,
+       droprate=None, max_workers=None):
 
     # use window and subtract average
     data1_win = data1.copy()
@@ -153,7 +154,7 @@ def cv(data1, data2, freqinfo, lambdainfo, nfold=5, droprate=None):
     # cross-validation with multi process
     cvdata = np.zeros((3, lambdas.shape[0])).T
     cvdata[:,0] = lambdas
-    with ProcessPoolExecutor(MAX_WORKERS) as executor:
+    with ProcessPoolExecutor(max_workers) as executor:
         futures = tqdm([executor.submit(_cv, lam=lam,
                                         data1=data1_win,
                                         data2=data2_win,
@@ -196,7 +197,8 @@ def _stcs(data1, data2, segrange, freqinfo, lam, droprate=None):
 
 @stopwatch
 def stcs(data1, data2, freqinfo, lam, tperseg, toverlap,
-         window='hann', x_name='X.dat', droprate=None):
+         window='hann', x_name='X.dat', droprate=None,
+         max_workers=None):
 
     # calucurate segranges
     t_min, t_max = _get_minmax(data1[:,0], data2[:,0])
@@ -214,11 +216,11 @@ def stcs(data1, data2, freqinfo, lam, tperseg, toverlap,
                                          freqinfo[2], lam,
                                          tperseg, toverlap]})
     df_stcsinfo.to_csv('stcsinfo.txt', sep=' ', header=False, index=False)
-    print(df_stcsinfo)
+    # print(df_stcsinfo)
 
     # short time CS with multithread
     X = np.zeros((freqinfo[2]*4, segranges.shape[0]))
-    with ProcessPoolExecutor(MAX_WORKERS) as executor:
+    with ProcessPoolExecutor(max_workers) as executor:
         futures = tqdm([executor.submit(_stcs, segrange=segrange,
                                         data1=data1, data2=data2,
                                         freqinfo=freqinfo,
@@ -232,6 +234,7 @@ def stcs(data1, data2, freqinfo, lam, tperseg, toverlap,
     freq = _get_frecvec(freqinfo)
     np.savetxt(x_name, X)
     return freq, t, X
+
 
 def _istcs(x, segrange, data1, data2, freqinfo, need_sect, **winargs):
     # print(f'start {segrange}')
@@ -250,7 +253,6 @@ def _istcs(x, segrange, data1, data2, freqinfo, need_sect, **winargs):
     # reconstruct
     window = WindowGenerator(segrange)
     window.triang(winargs['winargs']['basewidth'])
-    print(segrange, data1_seg[:,1].mean())
     wy1 = window.gene(data1_seg[:,0])*(y1+ data1_seg[:,1].mean())
     wy2 = window.gene(data2_seg[:,0])*(y2 + data2_seg[:,1].mean())
 
@@ -265,7 +267,8 @@ def _istcs(x, segrange, data1, data2, freqinfo, need_sect, **winargs):
 
 
 @stopwatch
-def istcs(X, data1, data2, freqinfo, tperseg, toverlap, **winargs):
+def istcs(X, data1, data2, freqinfo, tperseg, toverlap,
+          max_workers=None, **winargs):
     '''
     T: ndarray
         The series of start time of each segment
@@ -280,7 +283,7 @@ def istcs(X, data1, data2, freqinfo, tperseg, toverlap, **winargs):
     y1_rec[:,1] = np.zeros(data1.shape[0])
     y2_rec[:,1] = np.zeros(data2.shape[0])
 
-    with ProcessPoolExecutor(MAX_WORKERS) as executor:
+    with ProcessPoolExecutor(max_workers) as executor:
         need_sect = (tperseg - toverlap) * 1
         futures = tqdm([executor.submit(_istcs, x=x, segrange=segrange,
                                  data1=data1, data2=data2,
