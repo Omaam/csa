@@ -133,7 +133,7 @@ def _cv(data1, data2, freqinfo, lam, nfold=5, droprate=None):
 
 @stopwatch
 def cv(data1, data2, freqinfo, lambdainfo, nfold=5,
-       droprate=None, max_workers=None):
+       droprate=None, max_workers=None, tqdm_disable=False):
 
     # use window and subtract average
     data1_win = data1.copy()
@@ -160,7 +160,8 @@ def cv(data1, data2, freqinfo, lambdainfo, nfold=5,
                                         data2=data2_win,
                                         freqinfo=freqinfo,
                                         droprate=droprate)
-                       for lam in lambdas])
+                       for lam in lambdas],
+                       disable=tqdm_disable)  # tqdm option
         for k, future in enumerate(futures):
             cvdata[k,1:] = future.result()
 
@@ -181,10 +182,6 @@ def _stcs(data1, data2, segrange, freqinfo, lam, droprate=None):
     window.hann()
     data1_seg_win[:,1] = _sub_ave(data1_seg[:,1]) * window.gene(data1_seg[:,0])
     data2_seg_win[:,1] = _sub_ave(data2_seg[:,1]) * window.gene(data2_seg[:,0])
-    # data1_seg_win[:,1] = data1_seg[:,1] * window.gene(data1_seg[:,0])
-    # data2_seg_win[:,1] = data2_seg[:,1] * window.gene(data2_seg[:,0])
-    # acf = window.acf
-    # ecf = window.ecf
 
     # drop rows
     if droprate:
@@ -198,7 +195,7 @@ def _stcs(data1, data2, segrange, freqinfo, lam, droprate=None):
 @stopwatch
 def stcs(data1, data2, freqinfo, lam, tperseg, toverlap,
          window='hann', x_name='X.dat', droprate=None,
-         max_workers=None):
+         max_workers=None, tqdm_disable=False):
 
     # calucurate segranges
     t_min, t_max = _get_minmax(data1[:,0], data2[:,0])
@@ -225,7 +222,8 @@ def stcs(data1, data2, freqinfo, lam, tperseg, toverlap,
                                         data1=data1, data2=data2,
                                         freqinfo=freqinfo,
                                         lam=lam, droprate=droprate)
-                       for segrange in segranges])
+                       for segrange in segranges],
+                       disable=tqdm_disable)  # tqdm option
         for i, future in enumerate(futures):
             X[:,i] = future.result()
 
@@ -268,7 +266,7 @@ def _istcs(x, segrange, data1, data2, freqinfo, need_sect, **winargs):
 
 @stopwatch
 def istcs(X, data1, data2, freqinfo, tperseg, toverlap,
-          max_workers=None, **winargs):
+          max_workers=None, tqdm_disable=False, **winargs):
     '''
     T: ndarray
         The series of start time of each segment
@@ -289,7 +287,8 @@ def istcs(X, data1, data2, freqinfo, tperseg, toverlap,
                                  data1=data1, data2=data2,
                                  freqinfo=freqinfo, need_sect=need_sect,
                                  winargs=winargs)
-                       for segrange, x in zip(segranges, X.T)])
+                       for segrange, x in zip(segranges, X.T)],
+                       disable=tqdm_disable)  # tqdm option
         for i, future in enumerate(futures):
             # get results
             data1_seg_out, data2_seg_out = future.result()
