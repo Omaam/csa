@@ -4,12 +4,18 @@ import os
 
 def stopwatch(func):
     def wrapper(*arg, **kargs):
-        start = time.time()
-        print(f'start {func.__name__}')
-        res = func(*arg, **kargs)
-        dura = (time.time() - start)
-        print(time.strftime(f'finish {func.__name__}: %H:%M\'%S\"',
-                            time.gmtime(dura)))
+        try:
+            if kargs['set_verbose'] is False:
+                res = func(*arg, **kargs)
+            else:
+                raise KeyError
+        except KeyError:
+            start = time.time()
+            print(f'start {func.__name__}')
+            res = func(*arg, **kargs)
+            dura = (time.time() - start)
+            print(time.strftime(f'finish {func.__name__}: %H:%M\'%S\"',
+                                time.gmtime(dura)))
         return res
     return wrapper
 
