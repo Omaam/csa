@@ -71,12 +71,21 @@ def make_summary(x, freqinfo, anti=False):
     df_sum = df_x[['lag', 'norm12', 'norm1', 'norm2',\
                    'period', 'freq']][df_x.norm12 > 0]
     if anti:
-        df_sum = _make_antisum(df_sum)
+        df_sum = make_antisum(df_sum)
 
     return df_sum
 
 
-def phist(X, freqinfo, bins=10, lagrange=None, density=False):
+def make_antisum(df_sum):
+    df_sum_out = df_sum.copy()
+    df_sum_out['lag'] = list(map(
+        lambda lag, peri: lag - peri/2 if lag >= 0 else lag + peri/2,
+        df_sum_out['lag'], df_sum_out['period']))
+    return df_sum_out
+
+
+def phist(X, freqinfo, bins=10, lagrange=None, density=False,
+          anti=False):
 
     # add axis if X has 1-dimension
     if len(X.shape) == 1:
@@ -85,7 +94,7 @@ def phist(X, freqinfo, bins=10, lagrange=None, density=False):
     phists = []
     for i, x in enumerate(X.T):
         # make sumarry
-        df_sum = make_summary(x, freqinfo)
+        df_sum = make_summary(x, freqinfo, anti=anti)
 
         # get values
         lags = df_sum.lag
