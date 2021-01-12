@@ -1,11 +1,10 @@
-import time
-
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-from .signiftest import LagSignifTest
-from .deco import stopwatch
+from csa.signiftest import LagSignifTest
+from csa.deco import stopwatch
+from csa.tools import phist
 
 
 __all__ = ['signiftest', 'query_forX']
@@ -20,7 +19,7 @@ def _get_freq(freqinfo):
 
 
 def _limit_phase(phase_diff):
-    if phase_diff < -np.pi: # phase_lag > pi
+    if phase_diff < -np.pi:  # phase_lag > pi
         phase_diff_out = 2*np.pi + phase_diff
     elif phase_diff >= np.pi:
         phase_diff_out = -2*np.pi + phase_diff
@@ -52,7 +51,7 @@ def _make_summary(x, freqinfo, anti=False):
     df_x['lag'] = delta_alpha / (2 * np.pi * df_x.freq.values)
 
     # summary
-    df_sum = df_x[['lag', 'norm12', 'norm1', 'norm2',\
+    df_sum = df_x[['lag', 'norm12', 'norm1', 'norm2',
                    'period', 'freq']][df_x.norm12 > 0]
     if anti:
         df_sum = _make_antisum(df_sum)
@@ -78,7 +77,7 @@ def _make_periodicsum(x, freqinfo, peridicrange):
         # munus
         i = -1
         lag_peri = lag - period
-        #while lag_peri > peridicrange[0]:
+        # while lag_peri > peridicrange[0]:
         while peridicrange[0] < lag + (i*period) <= peridicrange[1]:
             lag_peri = lag + (i*period)
             new_col = np.array([lag_peri, norm12, norm1,
@@ -92,15 +91,15 @@ def _make_periodicsum(x, freqinfo, peridicrange):
 def _search_index(a, v):
     idx_out = []
     for vv in v:
-        idx_match = int(np.where(a==vv)[0])
+        idx_match = int(np.where(a == vv)[0])
         idx_out.append(idx_match)
     return np.array(idx_out)
 
 
 def _make_antisum(df_sum):
     df_sum_out = df_sum.copy()
-    df_sum_out.loc[:,'lag'] = list(map(
-        lambda lag, peri: lag - peri/2 if lag >= 0 else lag + period/2,
+    df_sum_out.loc[:, 'lag'] = list(map(
+        lambda lag, peri: lag - peri/2 if lag >= 0 else lag + peri/2,
         df_sum_out['lag'], df_sum_out['period']))
     return df_sum_out
 
@@ -113,11 +112,12 @@ def query_forX(X, freqinfo, para, pararanges,
     '''
     '''
     X_out = _adjuster_forX(_query_forX, X, freqinfo, para, pararanges,
-                            mode=mode, anti=anti, periodic=periodic)
+                           mode=mode, anti=anti, periodic=periodic)
     return X_out
 
+
 def _query_forX(x, freqinfo, para, pararanges,
-               mode='ext', anti=False, periodic=False):
+                mode='ext', anti=False, periodic=False):
 
     # get basic quantity
     df_sum = _make_summary(x, freqinfo, anti=anti)
@@ -127,7 +127,8 @@ def _query_forX(x, freqinfo, para, pararanges,
     freqs = _get_freq(freqinfo)
     pararanges = np.array(pararanges)
 
-    # make the shape of pararanges (:,2)
+    # make the shape of pararanges (:,2) even if
+    # the original shape is (:, 1)
     if isinstance(pararanges[0], np.ndarray) is False:
         pararanges = [pararanges]
 
@@ -137,7 +138,8 @@ def _query_forX(x, freqinfo, para, pararanges,
         freq_quer = df_sum.query(
             f'{pararange[0]} <= {para} < {pararange[1]}').freq
         idx_quer = _search_index(freqs, freq_quer)
-        flags[idx_quer] = 1
+        if idx_quer.size != 0:
+            flags[idx_quer] = 1
 
     # reverse if 'cut' mode
     if 'cut' in mode:
@@ -154,10 +156,11 @@ def signiftest(X, freqinfo, testrange, lagbinwidth=1,
     '''
     '''
     X_out = _adjuster_forX(_signiftest, X, freqinfo, testrange,
-                            lagbinwidth=lagbinwidth,
-                            iteration=iteration, ci=ci,
-                            periodic=periodic, anti=anti)
+                           lagbinwidth=lagbinwidth,
+                           iteration=iteration, ci=ci,
+                           periodic=periodic, anti=anti)
     return X_out
+
 
 def _signiftest(x, freqinfo, testrange, lagbinwidth=1,
                 iteration=1000, ci=0.9, periodic=False, anti=False):
@@ -179,6 +182,12 @@ def subtractX(X_minuend, X_subtrahend):
     return X_diff
 
 
+def addX(*X_addends):
+    X_sum = X_addends[0].copy()
+    for X_addend in X_addends[1:]:
+        cond_nonzero = (X_addend != 0)
+        X_sum[cond_nonzero] += X_addend[cond_nonzero]
+    return X_sum
 
 
 def _adjuster_forX(func, X, *args, **kargs):
@@ -194,7 +203,7 @@ def _adjuster_forX(func, X, *args, **kargs):
     elif len(X.shape) == 2:
         X_out = X.copy()
         for i, x in enumerate(tqdm(X.T)):
-            X_out[:,i] = func(x, *args, **kargs)
+            X_out[:, i] = func(x, *args, **kargs)
     return X_out
 
 
@@ -202,14 +211,13 @@ def main():
     freqinfo = [0, 0.5, 2000]
     X = np.loadtxt('../example/X.dat')
     testrange = [-10, 10]
-    lags, powsums = lagmap(X, freqinfo, range=[-10,10])
-    print(lags, powsums)
+    lags, powsums = phist(X, freqinfo, lagrange=[-10, 10])
 
     x_cut = query_forX(X, freqinfo, 'lag', [-2, 2], 'cut')
     print(_make_summary(x_cut, freqinfo))
     x_signif = signiftest(x_cut, freqinfo, testrange, iteration=100,
                           periodic=True)
-    print(_make_summary(x, freqinfo))
+    print(_make_summary(X, freqinfo))
     print(_make_summary(x_signif, freqinfo))
 
 
