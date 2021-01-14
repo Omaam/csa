@@ -1,9 +1,7 @@
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
 
 from csa.signiftest import LagSignifTest
-from csa.deco import stopwatch
 from csa.tools import phist
 
 
@@ -59,7 +57,30 @@ def _make_summary(x, freqinfo, anti=False):
     return df_sum
 
 
-def _make_periodicsum(x, freqinfo, peridicrange):
+def _make_periodicsum(x, freqinfo, lagrange):
+    # load df_sum
+    df_sum = _make_summary(x, freqinfo)
+    n_ori = df_sum.shape[0]
+
+    # duplicate periodical counterparts
+    sumdata = df_sum.values
+    for row in df_sum.itertuples(index=False):
+        # get periodical lag
+        lagdup_plus = np.arange(row.lag, lagrange[1], row.period)
+        lagdup_minu = -np.arange(-row.lag, np.abs(lagrange[0]), row.period)
+        lagdup = np.unique(np.hstack([lagdup_plus, lagdup_minu]))
+
+        # append to sumdata
+        sumdata_dup = np.tile(row, (len(lagdup), 1))
+        sumdata_dup[:, 0] = lagdup
+        sumdata = np.append(sumdata, sumdata_dup, axis=0)
+
+    # recreate df_sum for output
+    df_sum_out = pd.DataFrame(sumdata[n_ori:], columns=df_sum.columns)
+    return df_sum_out
+
+
+def _make_periodicsumold(x, freqinfo, peridicrange):
     df_sum = _make_summary(x, freqinfo)
     columns = df_sum.columns.values
     ndarray_sum = df_sum.values
@@ -123,7 +144,7 @@ def _query_forX(x, freqinfo, para, pararanges,
     df_sum = _make_summary(x, freqinfo, anti=anti)
     if periodic:
         periodicrange = np.quantile(df_sum.lag, [0.01, 0.99])
-        df_sum = _make_periodicsum(x, freqinfo, periodicrange)
+        df_sum = _make_periodicsumold(x, freqinfo, periodicrange)
     freqs = _get_freq(freqinfo)
     pararanges = np.array(pararanges)
 
@@ -150,9 +171,9 @@ def _query_forX(x, freqinfo, para, pararanges,
     return x_out
 
 
-@stopwatch
 def signiftest(X, freqinfo, testrange, lagbinwidth=1,
-               iteration=1000, ci=0.9, periodic=False, anti=False):
+               iteration=1000, ci=0.9, periodic=False,
+               anti=False):
     '''
     '''
     X_out = _adjuster_forX(_signiftest, X, freqinfo, testrange,
@@ -163,7 +184,8 @@ def signiftest(X, freqinfo, testrange, lagbinwidth=1,
 
 
 def _signiftest(x, freqinfo, testrange, lagbinwidth=1,
-                iteration=1000, ci=0.9, periodic=False, anti=False):
+                iteration=1000, ci=0.9, periodic=False,
+                anti=False):
 
     df_sum = _make_summary(x, freqinfo, anti=anti)
     tester = LagSignifTest(df_sum, lagrange=testrange,
@@ -202,7 +224,7 @@ def _adjuster_forX(func, X, *args, **kargs):
     # for stcs
     elif len(X.shape) == 2:
         X_out = X.copy()
-        for i, x in enumerate(tqdm(X.T)):
+        for i, x in enumerate(X.T):
             X_out[:, i] = func(x, *args, **kargs)
     return X_out
 
@@ -210,15 +232,13 @@ def _adjuster_forX(func, X, *args, **kargs):
 def main():
     freqinfo = [0, 0.5, 2000]
     X = np.loadtxt('../example/X.dat')
-    testrange = [-10, 10]
     lags, powsums = phist(X, freqinfo, lagrange=[-10, 10])
 
-    x_cut = query_forX(X, freqinfo, 'lag', [-2, 2], 'cut')
-    print(_make_summary(x_cut, freqinfo))
+    x_cut = query_forX(X, freqinfo, 'lag', [-2, 2], 'cut', periodic=True)
+    testrange = [-10, 10]
     x_signif = signiftest(x_cut, freqinfo, testrange, iteration=100,
                           periodic=True)
-    print(_make_summary(X, freqinfo))
-    print(_make_summary(x_signif, freqinfo))
+    print(x_signif)
 
 
 if __name__ == '__main__':
