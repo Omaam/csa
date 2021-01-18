@@ -1,25 +1,24 @@
-from concurrent.futures import ProcessPoolExecutor, as_completed
-import time
+from concurrent.futures import ProcessPoolExecutor
 import os
-ncpu = os.cpu_count()
-MAX_WORKERS = ncpu
-print(f'number of cpu: {ncpu}')
 
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
-from scipy import signal
-from scipy import interpolate
 from sklearn.model_selection import KFold
-from tqdm import tqdm, trange
+from tqdm import tqdm
 
-from csa.make_matrix import mkmat_cs, mkmat_cs_w
+from csa.make_matrix import mkmat_cs
 from csa.fista import fista
 from csa.window_function import WindowGenerator
 from csa.summary_handler import SummaryNew
 from csa.deco import stopwatch, change_directory
-import csa.xhandler as xhan
 from csa.cvresult import show_cvdata, lambda_fromcvdata
+
+
+# confirm the number of CPU
+ncpu = os.cpu_count()
+MAX_WORKERS = ncpu
+print(f'number of cpu: {ncpu}')
+
 
 __all__ = ['cs', 'cv', 'stcs', 'istcs']
 
@@ -43,6 +42,7 @@ def _get_minmax(*args):
     a = np.hstack(args)
     return a.min(), a.max()
 
+
 def _get_frecvec(freqinfo):
     freq_edge = np.linspace(freqinfo[0],
                             freqinfo[1],
@@ -58,8 +58,8 @@ def _complement_index(ind):
 
 
 def _query_lightcurve(data, timerage):
-    data_out = data[np.where((timerage[0] <= data[:,0]) &\
-                              (data[:,0] < timerage[1]))]
+    data_out = data[np.where((timerage[0] <= data[:, 0]) &
+                             (data[:, 0] < timerage[1]))]
     return data_out
 
 
@@ -87,8 +87,8 @@ def _segment_time(t_sta, t_end, tperseg, toverlap):
 
 
 def _search_index(original, condition):
-    l = list(original)
-    indices = np.array(list(map(lambda a: l.index(a),
+    lis = list(original)
+    indices = np.array(list(map(lambda a: lis.index(a),
                                 condition)))
     return indices
 
@@ -110,8 +110,8 @@ def _cv(data1, data2, freqinfo, lam, nfold=5, droprate=None):
     freqs = _get_frecvec(freqinfo)
 
     # get nfold index
-    kf1 = KFold(nfold, shuffle=True)#, random_state=1)
-    kf2 = KFold(nfold, shuffle=True)#, random_state=2)
+    kf1 = KFold(nfold, shuffle=True)
+    kf2 = KFold(nfold, shuffle=True)
     sp1 = kf1.split(data1)
     sp2 = kf2.split(data2)
 
@@ -124,9 +124,9 @@ def _cv(data1, data2, freqinfo, lam, nfold=5, droprate=None):
 
         # calcurate rms
         freq, x_tr = fista(data1_tr, data2_tr, freqinfo, lam)
-        A_mat_te = mkmat_cs(data1_te[:,0], data2_te[:,0], freqs)
+        A_mat_te = mkmat_cs(data1_te[:, 0], data2_te[:, 0], freqs)
         y_te = np.dot(A_mat_te, x_tr)
-        data_te = np.hstack([data1_te[:,1], data2_te[:,1]])
+        data_te = np.hstack([data1_te[:, 1], data2_te[:, 1]])
         rms[i] = np.sqrt(np.dot((data_te - y_te).T, data_te - y_te))
     return rms.mean(), rms.std()
 
@@ -138,12 +138,11 @@ def cv(data1, data2, freqinfo, lambdainfo, nfold=5,
     # use window and subtract average
     data1_win = data1.copy()
     data2_win = data2.copy()
-    t_minmax = _get_minmax(data1[:,0], data2[:,0])
+    t_minmax = _get_minmax(data1[:, 0], data2[:, 0])
     window = WindowGenerator(t_minmax)
     window.hann()
-    data1_win[:,1] = _sub_ave(data1[:,1]) * window.gene(data1[:,0])
-    data2_win[:,1] = _sub_ave(data2[:,1]) * window.gene(data2[:,0])
-
+    data1_win[:, 1] = _sub_ave(data1[:, 1]) * window.gene(data1[:, 0])
+    data2_win[:, 1] = _sub_ave(data2[:, 1]) * window.gene(data2[:, 0])
 
     # set lambda info
     lambdas = np.logspace(np.log10(lambdainfo[0]),
@@ -153,7 +152,7 @@ def cv(data1, data2, freqinfo, lambdainfo, nfold=5,
 
     # cross-validation with multi process
     cvdata = np.zeros((3, lambdas.shape[0])).T
-    cvdata[:,0] = lambdas
+    cvdata[:, 0] = lambdas
     with ProcessPoolExecutor(max_workers) as executor:
         futures = tqdm([executor.submit(_cv, lam=lam,
                                         data1=data1_win,
@@ -163,7 +162,7 @@ def cv(data1, data2, freqinfo, lambdainfo, nfold=5,
                        for lam in lambdas],
                        disable=not set_verbose)  # tqdm option
         for k, future in enumerate(futures):
-            cvdata[k,1:] = future.result()
+            cvdata[k, 1:] = future.result()
 
     return cvdata
 
@@ -180,8 +179,10 @@ def _stcs(data1, data2, segrange, freqinfo, lam, droprate=None):
     # use window fuction
     window = WindowGenerator(segrange)
     window.hann()
-    data1_seg_win[:,1] = _sub_ave(data1_seg[:,1]) * window.gene(data1_seg[:,0])
-    data2_seg_win[:,1] = _sub_ave(data2_seg[:,1]) * window.gene(data2_seg[:,0])
+    data1_seg_win[:, 1] = \
+        _sub_ave(data1_seg[:, 1]) * window.gene(data1_seg[:, 0])
+    data2_seg_win[:, 1] = \
+        _sub_ave(data2_seg[:, 1]) * window.gene(data2_seg[:, 0])
 
     # drop rows
     if droprate:
@@ -192,28 +193,15 @@ def _stcs(data1, data2, segrange, freqinfo, lam, droprate=None):
     freq, x_seg = fista(data1_seg_win, data2_seg_win, freqinfo, lam)
     return x_seg
 
+
 @stopwatch
 def stcs(data1, data2, freqinfo, lam, tperseg, toverlap,
          window='hann', x_name='X.dat', droprate=None,
          max_workers=None, set_verbose=True):
 
     # calucurate segranges
-    t_min, t_max = _get_minmax(data1[:,0], data2[:,0])
+    t_min, t_max = _get_minmax(data1[:, 0], data2[:, 0])
     segranges = _segment_time(t_min, t_max, tperseg, toverlap)
-
-    # load infile
-    df_data1 = pd.DataFrame(data1)
-    df_data2 = pd.DataFrame(data2)
-
-    # output condition
-    df_stcsinfo = pd.DataFrame({'cols': ['freq_lo', 'freq_up',
-                                         'nfreq', 'lambda',
-                                         'tperseg', 'toverlap'],
-                                'vals': [freqinfo[0], freqinfo[1],
-                                         freqinfo[2], lam,
-                                         tperseg, toverlap]})
-    df_stcsinfo.to_csv('stcsinfo.txt', sep=' ', header=False, index=False)
-    # print(df_stcsinfo)
 
     # short time CS with multithread
     X = np.zeros((freqinfo[2]*4, segranges.shape[0]))
@@ -225,7 +213,7 @@ def stcs(data1, data2, freqinfo, lam, tperseg, toverlap,
                        for segrange in segranges],
                        disable=not set_verbose)  # tqdm option
         for i, future in enumerate(futures):
-            X[:,i] = future.result()
+            X[:, i] = future.result()
 
     # output
     t = np.mean(segranges, axis=1)
@@ -234,7 +222,7 @@ def stcs(data1, data2, freqinfo, lam, tperseg, toverlap,
     return freq, t, X
 
 
-def _istcs(x, segrange, data1, data2, freqinfo, need_sect, **winargs):
+def _istcs(x, segrange, data1, data2, freqinfo, need_sect, add_ave, **winargs):
     # print(f'start {segrange}')
 
     # query time which is in segrange
@@ -246,19 +234,21 @@ def _istcs(x, segrange, data1, data2, freqinfo, need_sect, **winargs):
     # make summary instance
     # (later summary instance -> x instance)
     summ = SummaryNew(x, freqinfo)
-    y1, y2 = summ.pred(data1_seg[:,0], data2_seg[:,0])
+    y1, y2 = summ.pred(data1_seg[:, 0], data2_seg[:, 0])
 
     # reconstruct
     window = WindowGenerator(segrange)
     window.triang(winargs['winargs']['basewidth'])
-    wy1 = window.gene(data1_seg[:,0])*(y1+ data1_seg[:,1].mean())
-    wy2 = window.gene(data2_seg[:,0])*(y2 + data2_seg[:,1].mean())
+    mean1_seg = data1_seg[:, 1].mean() if add_ave else 0
+    mean2_seg = data2_seg[:, 1].mean() if add_ave else 0
+    wy1 = window.gene(data1_seg[:, 0]) * (y1 + mean1_seg)
+    wy2 = window.gene(data2_seg[:, 0]) * (y2 + mean2_seg)
 
     # substitution; to conserve energy, it is divided by
     # Energy Correction Factor (ECF)
     win_sect = window.sect
-    data1_seg_out[:,1] = wy1 * (need_sect/win_sect)
-    data2_seg_out[:,1] = wy2 * (need_sect/win_sect)
+    data1_seg_out[:, 1] = wy1 * (need_sect/win_sect)
+    data2_seg_out[:, 1] = wy2 * (need_sect/win_sect)
 
     # print(f'finish {segrange}')
     return data1_seg_out, data2_seg_out
@@ -266,27 +256,28 @@ def _istcs(x, segrange, data1, data2, freqinfo, need_sect, **winargs):
 
 @stopwatch
 def istcs(X, data1, data2, freqinfo, tperseg, toverlap,
-          max_workers=None, set_verbose=True, **winargs):
+          max_workers=None, set_verbose=True, add_ave=True,
+          **winargs):
     '''
     T: ndarray
         The series of start time of each segment
     '''
     # calucurate segranges
-    t_min, t_max = _get_minmax(data1[:,0], data2[:,0])
+    t_min, t_max = _get_minmax(data1[:, 0], data2[:, 0])
     segranges = _segment_time(t_min, t_max, tperseg, toverlap)
 
     # prepare ndarray for reconstraction
     y1_rec = data1.copy()
     y2_rec = data2.copy()
-    y1_rec[:,1] = np.zeros(data1.shape[0])
-    y2_rec[:,1] = np.zeros(data2.shape[0])
+    y1_rec[:, 1] = np.zeros(data1.shape[0])
+    y2_rec[:, 1] = np.zeros(data2.shape[0])
 
     with ProcessPoolExecutor(max_workers) as executor:
         need_sect = (tperseg - toverlap) * 1
         futures = tqdm([executor.submit(_istcs, x=x, segrange=segrange,
-                                 data1=data1, data2=data2,
-                                 freqinfo=freqinfo, need_sect=need_sect,
-                                 winargs=winargs)
+                        data1=data1, data2=data2, freqinfo=freqinfo,
+                        need_sect=need_sect, add_ave=add_ave,
+                        winargs=winargs)
                        for segrange, x in zip(segranges, X.T)],
                        disable=not set_verbose)  # tqdm option
         for i, future in enumerate(futures):
@@ -294,14 +285,14 @@ def istcs(X, data1, data2, freqinfo, tperseg, toverlap,
             data1_seg_out, data2_seg_out = future.result()
 
             # search index
-            indices_t1 = _search_index(data1[:,0], data1_seg_out[:,0])
-            indices_t2 = _search_index(data2[:,0], data2_seg_out[:,0])
+            indices_t1 = _search_index(data1[:, 0], data1_seg_out[:, 0])
+            indices_t2 = _search_index(data2[:, 0], data2_seg_out[:, 0])
 
             # add results
-            y1_rec[indices_t1, 1] = y1_rec[indices_t1, 1] \
-                                     + data1_seg_out[:,1]
-            y2_rec[indices_t2, 1] = y2_rec[indices_t2, 1] \
-                                     + data2_seg_out[:,1]
+            y1_rec[indices_t1, 1] = \
+                y1_rec[indices_t1, 1] + data1_seg_out[:, 1]
+            y2_rec[indices_t2, 1] = \
+                y2_rec[indices_t2, 1] + data2_seg_out[:, 1]
 
     return y1_rec, y2_rec
 
@@ -346,7 +337,6 @@ def main():
         np.savetxt('time.dat', t)
         np.savetxt('freq.dat', freqs)
 
-
     # inverse short-time common signal analysis
     if ISTCS:
         X = np.loadtxt('X.dat')
@@ -370,16 +360,16 @@ def main():
 
         # figure
         fig, ax = plt.subplots(2, sharex=True)
-        ax[0].plot(data2[:,0], data2[:,1],
-                   y2_rec[:,0], y2_rec[:,1],)
-                   # data2_lag[:,0], data2_lag[:,1],
-                   # data2_rem[:,0], data2_rem[:,1],)
+        ax[0].plot(data2[:, 0], data2[:, 1],
+                   y2_rec[:, 0], y2_rec[:, 1],)
+        #            data2_lag[:,0], data2_lag[:,1],
+        #            data2_rem[:,0], data2_rem[:,1],)
         ax[0].set_ylabel('Optical flux')
         ax[0].legend(['original', 'istcs', 'lag', 'rem'])
-        ax[1].plot(data1[:,0], data1[:,1],
-                   y1_rec[:,0], y1_rec[:,1],)
-                   # data1_lag[:,0], data1_lag[:,1],
-                   # data1_rem[:,0], data1_rem[:,1],)
+        ax[1].plot(data1[:, 0], data1[:, 1],
+                   y1_rec[:, 0], y1_rec[:, 1],)
+        #          data1_lag[:,0], data1_lag[:,1],
+        #          data1_rem[:,0], data1_rem[:,1],)
         ax[1].set_ylabel('X-ray flux')
         ax[1].set_xlabel('Time')
         fig.savefig('lc_ncf_noavesub.png')

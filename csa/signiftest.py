@@ -1,13 +1,12 @@
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor
 import os
-ncpu = os.cpu_count()
-MAX_WORKERS = ncpu
-# print(f'number of cpu: {ncpu}')
 
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-from tqdm import tqdm
+
+ncpu = os.cpu_count()
+MAX_WORKERS = ncpu
+# print(f'number of cpu: {ncpu}')
 
 
 def set_bins(low, hig, binsize):
@@ -27,10 +26,12 @@ def set_bins(low, hig, binsize):
     bins = bins / np.power(10, nd_max)
     return bins
 
+
 def _make_model(periods, lagbins):
-        lags = np.random.rand(len(periods))*periods - periods/2
-        lagdistmodel = pd.cut(lags, bins=lagbins).value_counts().values
-        return lagdistmodel
+    lags = np.random.rand(len(periods))*periods - periods/2
+    lagdistmodel = pd.cut(lags, bins=lagbins).value_counts().values
+    return lagdistmodel
+
 
 class LagSignifTest:
 
@@ -52,15 +53,15 @@ class LagSignifTest:
         self.lagrange = lagrange
         self.lag_binwidth = lag_binwidth
 
-
     def make_model(self, iteration=1000):
         '''make rondom model
         '''
-        lagbins = set_bins(self.lagrange[0], self.lagrange[1], self.lag_binwidth)
+        lagbins = set_bins(self.lagrange[0], self.lagrange[1],
+                           self.lag_binwidth)
         lagdistmodels = np.zeros((iteration, lagbins.shape[0]-1))
         with ProcessPoolExecutor(MAX_WORKERS) as executor:
-            futures = [executor.submit(_make_model,
-                                      periods=self.period, lagbins=lagbins)
+            futures = [executor.submit(_make_model, periods=self.period,
+                                       lagbins=lagbins)
                        for i in range(iteration)]
             for i, future in enumerate(futures):
                 lagdistmodels[i] = future.result()
@@ -69,17 +70,16 @@ class LagSignifTest:
         self.iteration = iteration
         self.n_model_tile = lagdistmodels
 
-
-
     def get_signifrange(self, ci=.68, retbins=False, verbose=False):
         ''' get significance lag range
         '''
-        lagbins = set_bins(self.lagrange[0], self.lagrange[1], self.lag_binwidth)
+        lagbins = set_bins(self.lagrange[0], self.lagrange[1],
+                           self.lag_binwidth)
         laglabel_list = np.array(list(zip(lagbins[:-1], lagbins[1:])))
         n_sample_list = pd.cut(self.lag, bins=lagbins).value_counts().values
         n_atci_list = []
-        for i in range(len(self.n_model_tile[0,:])):
-            n_atci = np.percentile(self.n_model_tile[:,i], 100*ci)
+        for i in range(len(self.n_model_tile[0, :])):
+            n_atci = np.percentile(self.n_model_tile[:, i], 100*ci)
             n_atci_list.append(n_atci)
         n_atci_list = np.array(n_atci_list)
         lag_ci_list = laglabel_list[n_sample_list >= n_atci_list]
@@ -96,15 +96,15 @@ class LagSignifTest:
         ''' get cignificance value
         '''
         n_atci_list = []
-        for i in range(len(self.n_model_tile[0,:])):
-            n_atci = np.percentile(self.n_model_tile[:,i], 100*ci)
+        for i in range(len(self.n_model_tile[0, :])):
+            n_atci = np.percentile(self.n_model_tile[:, i], 100*ci)
             n_atci_list.append(n_atci)
         n_atci_list = np.array(n_atci_list)
         return self.lagbins, n_atci_list
 
 
 if __name__ == "__main__":
-    
+
     df_sum = pd.read_csv(
         'example/out/sum.dat', sep=' ',
         names=['lag', 'norm12', 'norm1', 'norm2', 'period', 'freq'])

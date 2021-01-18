@@ -68,7 +68,7 @@ def _make_periodicsum(x, freqinfo, lagrange):
         # get periodical lag
         lagdup_plus = np.arange(row.lag, lagrange[1], row.period)
         lagdup_minu = -np.arange(-row.lag, np.abs(lagrange[0]), row.period)
-        lagdup = np.unique(np.hstack([lagdup_plus, lagdup_minu]))
+        lagdup = np.unique(np.hstack([lagdup_plus, lagdup_minu, row.lag]))
 
         # append to sumdata
         sumdata_dup = np.tile(row, (len(lagdup), 1))
@@ -144,7 +144,7 @@ def _query_forX(x, freqinfo, para, pararanges,
     df_sum = _make_summary(x, freqinfo, anti=anti)
     if periodic:
         periodicrange = np.quantile(df_sum.lag, [0.01, 0.99])
-        df_sum = _make_periodicsumold(x, freqinfo, periodicrange)
+        df_sum = _make_periodicsum(x, freqinfo, periodicrange)
     freqs = _get_freq(freqinfo)
     pararanges = np.array(pararanges)
 
@@ -152,6 +152,11 @@ def _query_forX(x, freqinfo, para, pararanges,
     # the original shape is (:, 1)
     if isinstance(pararanges[0], np.ndarray) is False:
         pararanges = [pararanges]
+
+    # if para = 'ratio', then make ratio
+    if para == 'ratio':
+        df_sum['ratio'] = list(map(lambda n1, n2: n1/n2 if n1 < n2 else n2/n1,
+                                   df_sum.norm1, df_sum.norm2))
 
     # search lag components and put 0
     flags = np.zeros(freqs.shape[0])

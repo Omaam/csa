@@ -13,7 +13,8 @@ def ccf(x, y, fs=1, maxlags=None):
     # calcurate correlation and lags
     n_x, n_y = len(x), len(y)
     T = max(n_x, n_y)
-    r = signal.correlate(y, x, mode='full') / T
+    r = signal.correlate(y, x, mode='full') / np.std(x) / np.std(y) / T
+    # r = signal.correlate(y, x, mode='full') / T
     lags = np.arange(-n_x + 1, n_y) / fs
 
     # query
@@ -43,9 +44,20 @@ def ccfbootstrap(Y1, Y2, droprate=1, fs=1,
     c_low, c_med, c_hig = np.quantile(C, q, axis=0)
     c_lowdev = (c_med - c_low)/np.sqrt(n_sample)
     c_higdev = (c_med - c_low)/np.sqrt(n_sample)
-    print(c_low[10], c_med[10], c_hig[10])
-    print((c_med-c_lowdev)[10], c_med[10], (c_med+c_higdev)[10])
     return lags, c_med-c_lowdev, c_med, c_med+c_higdev
+
+
+def lcbootstrap(Y, droprate=1, q=(0.025, 0.5, 0.975)):
+
+    # get number of each iteration for standard error
+    n_sample = Y.shape[1] * (1 - droprate)
+
+    # get quantile
+    y_low, y_med, y_hig = np.quantile(Y, q, axis=0)
+    y_lowdev = (y_med - y_low) / np.sqrt(n_sample)
+    y_higdev = (y_med - y_low) / np.sqrt(n_sample)
+
+    return y_med-y_lowdev, y_med, y_med+y_higdev
 
 
 @change_directory('../example')
