@@ -24,14 +24,13 @@ def ccf(x, y, fs=1, maxlags=None):
     return lag_out, r_out
 
 
-def ccfbootstrap(Y1, Y2, droprate=1, fs=1,
+def ccfbootstrap(Y1, Y2, droprate=0.0, fs=1,
                  q=(0.025, 0.5, 0.975), maxlags=None):
 
     # check whether the shapes of Y1 and Y2 are the same.
     assert Y1.shape == Y2.shape, \
            f'the sizes of Y1 and Y2 must be the same: \
              {Y1.shape} != {Y2.shape}'
-    n_sample = Y1.shape[1] * droprate
 
     # ccf
     C = []
@@ -42,20 +41,17 @@ def ccfbootstrap(Y1, Y2, droprate=1, fs=1,
 
     # get quantile
     c_low, c_med, c_hig = np.quantile(C, q, axis=0)
-    c_lowdev = (c_med - c_low)/np.sqrt(n_sample)
-    c_higdev = (c_med - c_low)/np.sqrt(n_sample)
+    c_lowdev = (c_med - c_low) / np.sqrt(1-droprate)
+    c_higdev = (c_med - c_low) / np.sqrt(1-droprate)
     return lags, c_med-c_lowdev, c_med, c_med+c_higdev
 
 
-def lcbootstrap(Y, droprate=1, q=(0.025, 0.5, 0.975)):
-
-    # get number of each iteration for standard error
-    n_sample = Y.shape[1] * (1 - droprate)
+def lcbootstrap(Y, droprate=0.0, q=(0.025, 0.5, 0.975)):
 
     # get quantile
     y_low, y_med, y_hig = np.quantile(Y, q, axis=0)
-    y_lowdev = (y_med - y_low) / np.sqrt(n_sample)
-    y_higdev = (y_med - y_low) / np.sqrt(n_sample)
+    y_lowdev = (y_med - y_low) / np.sqrt(1-droprate)
+    y_higdev = (y_med - y_low) / np.sqrt(1-droprate)
 
     return y_med-y_lowdev, y_med, y_med+y_higdev
 
