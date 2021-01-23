@@ -14,8 +14,8 @@ from csa.run import stcs, istcs, cv
 from csa.tools import segment_time, query_lightcurve
 from csa.cvresult import lambda_fromcvdata
 from csa.xhandler import query_forX, subtractX, signiftest, addX
-from csa.bootstrap import ccfbootstrap, ccf
 from fir_filter import fir
+from csa.bootstrap import ccfbootstrap, ccf
 from send_email import send_email
 
 
@@ -89,7 +89,7 @@ def _init_analysis(cv=False, stcs=False, istcs=False):
     # initialize
     if cv:
         files_cv = sorted(glob.glob('cv/cvdata*'))
-        for_sure = input('Do you want to remove "cvdata*.dat"? yes/no ')
+        for_sure = input('Are you want to remove "cvdata*.dat"? yes/no ')
         if for_sure == 'yes':
             list(map(lambda f: os.remove(f), files_cv))
             msg_cv = 'DELETED'
@@ -98,7 +98,7 @@ def _init_analysis(cv=False, stcs=False, istcs=False):
 
     if stcs:
         files_X = sorted(glob.glob('XY/X*'))
-        for_sure = input('Do you want to remove "X*.dat"? yes/no ')
+        for_sure = input('Are you want to remove "X*.dat"? yes/no ')
         if for_sure == 'yes':
             list(map(lambda f: os.remove(f), files_X))
             msg_stcs = 'DELETED'
@@ -107,7 +107,7 @@ def _init_analysis(cv=False, stcs=False, istcs=False):
 
     if istcs:
         files_data = sorted(glob.glob('XY/data*'))
-        for_sure = input('Do you want to remove "data*.dat"? yes/no ')
+        for_sure = input('Are you want to remove "data*.dat"? yes/no ')
         if for_sure == 'yes':
             list(map(lambda f: os.remove(f), files_data))
             msg_istcs = 'DELETED'
@@ -150,16 +150,16 @@ def preprocess_for_gx339(path_to_data, ndata=2000):
 def main():
 
     # initialize analysis
-    _init_analysis(cv=0, stcs=0, istcs=0)
+    _init_analysis(cv=1, stcs=0, istcs=0)
 
     # analysis switch
-    CV = 0
+    CV = 1
     STCS = 0
     ISTCS = 0
-    CCF = 1
+    CCF = 0
 
     # analytical info
-    LAMBDAINFO = [1e-2, 1e3, 20]
+    LAMBDAINFO = [1e-2, 1e4, 20]
     FREQINFO = [0, 10, 2000]
     TPERSEG = 50  # seconds
     TOVERLAP = 49  # seconds
@@ -167,7 +167,7 @@ def main():
     Fs = 20  # samples / second
     DROPRATE = 0.1
     NBOOT = 50
-    SETVERBOSE = False
+    SETBERBOSE = False
 
     # preprocess
     data1, data2 = preprocess_for_gx339(
@@ -187,7 +187,7 @@ def main():
             data2_seg = query_lightcurve(data2, segrange)
             cvdata = cv(data1_seg, data2_seg, FREQINFO, LAMBDAINFO,
                         droprate=DROPRATE, max_workers=CORE,
-                        set_verbose=SETVERBOSE)
+                        set_verbose=SETBERBOSE)
             np.savetxt('cv/cvdata_{}.txt'.format(str(i).rjust(4, '0')),
                        cvdata)
             lam = lambda_fromcvdata(cvdata)
@@ -209,7 +209,7 @@ def main():
         for _ in tqdm(range(NBOOT)):
             freqs, t, X = stcs(data1, data2, FREQINFO, lam_min,
                                TPERSEG, TOVERLAP, droprate=DROPRATE,
-                               max_workers=CORE, set_verbose=SETVERBOSE)
+                               max_workers=CORE, set_verbose=SETBERBOSE)
             filename = _get_savename('X', 'XY')
             np.savetxt(filename, X)
 
@@ -236,7 +236,7 @@ def main():
             data1_rec, data2_rec = istcs(X, data1, data2, FREQINFO,
                                          TPERSEG, TOVERLAP,
                                          max_workers=CORE,
-                                         set_verbose=SETVERBOSE,
+                                         set_verbose=SETBERBOSE,
                                          basewidth=BASEWIDTH_TRIANG)
             fname_data1 = 'data1_{}.dat'.format(str(i).rjust(3, '0'))
             fname_data2 = 'data2_{}.dat'.format(str(i).rjust(3, '0'))
@@ -247,7 +247,7 @@ def main():
             data1_xps, data2_xps = istcs(X_xps, data1, data2, FREQINFO,
                                          TPERSEG, TOVERLAP,
                                          max_workers=CORE,
-                                         set_verbose=SETVERBOSE,
+                                         set_verbose=SETBERBOSE,
                                          basewidth=BASEWIDTH_TRIANG)
             fname_data1_xps = 'data1_xps_{}.dat'.format(str(i).rjust(3, '0'))
             fname_data2_xps = 'data2_xps_{}.dat'.format(str(i).rjust(3, '0'))
@@ -258,7 +258,7 @@ def main():
             data1_ops, data2_ops = istcs(X_ops, data1, data2, FREQINFO,
                                          TPERSEG, TOVERLAP,
                                          max_workers=CORE,
-                                         set_verbose=SETVERBOSE,
+                                         set_verbose=SETBERBOSE,
                                          basewidth=BASEWIDTH_TRIANG)
             fname_data1_ops = 'data1_ops_{}.dat'.format(str(i).rjust(3, '0'))
             fname_data2_ops = 'data2_ops_{}.dat'.format(str(i).rjust(3, '0'))
@@ -269,7 +269,7 @@ def main():
             data1_xops, data2_xops = istcs(X_xops, data1, data2, FREQINFO,
                                            TPERSEG, TOVERLAP,
                                            max_workers=CORE,
-                                           set_verbose=SETVERBOSE,
+                                           set_verbose=SETBERBOSE,
                                            basewidth=BASEWIDTH_TRIANG)
             fname_data1_xops = 'data1_xops_{}.dat'.format(str(i).rjust(3, '0'))
             fname_data2_xops = 'data2_xops_{}.dat'.format(str(i).rjust(3, '0'))
@@ -285,7 +285,7 @@ def main():
         logger.debug(f'Y1_all: {Y1_all.shape}')
         logger.debug(f'Y2_all: {Y2_all.shape}')
         lags, q_low_all, q_med_all, q_hig_all = ccfbootstrap(
-            Y1_all, Y2_all, maxlags=10, droprate=DROPRATE, fs=Fs)
+            Y1_all, Y2_all, maxlags=10, fs=Fs, droprate=DROPRATE)
 
         # XPS:get lightcurves, collect flux, and get quantile
         files_data1 = sorted(glob.glob('XY/data1_xps_*.dat'))
@@ -295,7 +295,7 @@ def main():
         logger.debug(f'Y1_xps: {Y1_xps.shape}')
         logger.debug(f'Y2_xps: {Y2_xps.shape}')
         lags, q_low_xps, q_med_xps, q_hig_xps = ccfbootstrap(
-            Y1_xps, Y2_xps, maxlags=10, droprate=DROPRATE, fs=Fs)
+            Y1_xps, Y2_xps, maxlags=10, fs=Fs, droprate=DROPRATE)
 
         # OPS:get lightcurves, collect flux, and get quantile
         files_data1 = sorted(glob.glob('XY/data1_ops_*.dat'))
@@ -305,7 +305,7 @@ def main():
         logger.debug(f'Y1_ops: {Y1_ops.shape}')
         logger.debug(f'Y2_ops: {Y2_ops.shape}')
         lags, q_low_ops, q_med_ops, q_hig_ops = ccfbootstrap(
-            Y1_ops, Y2_ops, maxlags=10, droprate=DROPRATE, fs=Fs)
+            Y1_ops, Y2_ops, maxlags=10, fs=Fs, droprate=DROPRATE)
 
         # XPS + OPS:get lightcurves, collect flux, and get quantile
         files_data1 = sorted(glob.glob('XY/data1_xops_*.dat'))
@@ -315,7 +315,7 @@ def main():
         logger.debug(f'Y1_xops: {Y1_xops.shape}')
         logger.debug(f'Y2_xops: {Y2_xops.shape}')
         lags, q_low_xops, q_med_xops, q_hig_xops = ccfbootstrap(
-            Y1_xops, Y2_xops, maxlags=10, droprate=DROPRATE, fs=Fs)
+            Y1_xops, Y2_xops, maxlags=10, fs=Fs, droprate=DROPRATE)
 
         # figure
         fig, ax = plt.subplots(2, figsize=(5, 7), sharex=True)
@@ -338,7 +338,7 @@ def main():
         ax[1].set_ylabel('r')
 
         plt.tight_layout()
-        plt.savefig('ccf.png')
+        plt.savefig('fig/ccf.png')
         # plt.show()
 
 

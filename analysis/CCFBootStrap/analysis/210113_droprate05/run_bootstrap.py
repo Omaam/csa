@@ -93,6 +93,8 @@ def _init_analysis(cv=False, stcs=False, istcs=False):
         if for_sure == 'yes':
             list(map(lambda f: os.remove(f), files_cv))
             msg_cv = 'DELETED'
+        else:
+            msg_cv = 'NOT DELETED'
     else:
         msg_cv = 'NOT DELETED'
 
@@ -102,6 +104,8 @@ def _init_analysis(cv=False, stcs=False, istcs=False):
         if for_sure == 'yes':
             list(map(lambda f: os.remove(f), files_X))
             msg_stcs = 'DELETED'
+        else:
+            msg_cv = 'NOT DELETED'
     else:
         msg_stcs = 'NOT DELETED'
 
@@ -111,6 +115,8 @@ def _init_analysis(cv=False, stcs=False, istcs=False):
         if for_sure == 'yes':
             list(map(lambda f: os.remove(f), files_data))
             msg_istcs = 'DELETED'
+        else:
+            msg_cv = 'NOT DELETED'
     else:
         msg_istcs = 'NOT DELETED'
 
@@ -150,16 +156,16 @@ def preprocess_for_gx339(path_to_data, ndata=2000):
 def main():
 
     # initialize analysis
-    _init_analysis(cv=False, stcs=False, istcs=False)
+    _init_analysis(cv=True, stcs=False, istcs=False)
 
     # analysis switch
-    CV = 0
+    CV = 1
     STCS = 0
     ISTCS = 0
-    CCF = 1
+    CCF = 0
 
     # analytical info
-    LAMBDAINFO = [1e0, 1e3, 20]
+    LAMBDAINFO = [1e-2, 1e2, 20]
     FREQINFO = [0, 10, 2000]
     TPERSEG = 50  # seconds
     TOVERLAP = 49  # seconds
