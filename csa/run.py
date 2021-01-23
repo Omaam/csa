@@ -2,7 +2,6 @@ from concurrent.futures import ProcessPoolExecutor
 import os
 
 import numpy as np
-import matplotlib.pyplot as plt
 from sklearn.model_selection import KFold
 from tqdm import tqdm
 
@@ -10,8 +9,7 @@ from csa.make_matrix import mkmat_cs
 from csa.fista import fista
 from csa.window_function import WindowGenerator
 from csa.summary_handler import SummaryNew
-from csa.deco import stopwatch, change_directory
-from csa.cvresult import show_cvdata, lambda_fromcvdata
+from csa.deco import stopwatch
 
 
 # confirm the number of CPU
@@ -21,14 +19,6 @@ print(f'number of cpu: {ncpu}')
 
 
 __all__ = ['cs', 'cv', 'stcs', 'istcs']
-
-
-# analysis option
-CV = 0
-STCS = 1
-ISTCS = 1
-
-FIGSHOW = 1
 
 
 # functions for csa
@@ -296,87 +286,3 @@ def istcs(X, data1, data2, freqinfo, tperseg, toverlap,
                 y2_rec[indices_t2, 1] + data2_seg_out[:, 1]
 
     return y1_rec, y2_rec
-
-
-@change_directory('../example')
-def main():
-
-    # constant
-    tperseg = 1000
-    toverlap = 500
-    basewidth_triang = 2*(tperseg - toverlap)
-
-    # load data
-    data1 = np.loadtxt('xdata.dat')
-    data2 = np.loadtxt('odata.dat')
-    n1 = data1.shape[0]
-    n2 = data2.shape[0]
-    freqinfo = [0, 0.5, 2000]
-
-    # cross-validation
-    if CV:
-        cv_sta = np.random.randint(toverlap, np.min([n1, n2]) - tperseg)
-        cv_end = cv_sta + tperseg
-        print(f'time range of cv: [{cv_sta}, {cv_end}]')
-        cvdata = cv(data1[cv_sta:cv_end], data2[cv_sta:cv_end], freqinfo,
-                    [1e-2, 1e3, 20])
-        np.savetxt('cvdata.dat', cvdata)
-
-        # plot cvdata
-        show_cvdata(cvdata)
-        plt.savefig('cvcurve.png')
-        if FIGSHOW:
-            plt.show()
-    cvdata = np.loadtxt('./cvdata.dat')
-    lam_min = lambda_fromcvdata(cvdata, mode='min')
-    print(f'lam_min = {lam_min:.3f}')
-
-    # short-time common signal analysis
-    if STCS:
-        freqs, t, X = stcs(data1, data2, freqinfo, lam_min,
-                           tperseg, toverlap, droprate=None)
-        np.savetxt('time.dat', t)
-        np.savetxt('freq.dat', freqs)
-
-    # inverse short-time common signal analysis
-    if ISTCS:
-        X = np.loadtxt('X.dat')
-        print(X.shape)
-
-        # query lag comp. around true lag
-        # X_lag = xhan.signiftest(X, freqinfo, testrange=[-10, 10])
-        # X_lag = xhan.query_forX(X, freqinfo, 'lag', [3, 5])
-        # X_rem = xhan.subtractX(X, X_lag)
-
-        # istcs
-        y1_rec, y2_rec = istcs(X, data1, data2, freqinfo,
-                               tperseg, toverlap,
-                               basewidth=basewidth_triang)
-        # data1_lag, data2_lag = istcs(X_lag, data1, data2, freqinfo,
-        #                              tperseg, toverlap,
-        #                              basewidth=basewidth_triang)
-        # data1_rem, data2_rem = istcs(X_rem, data1, data2, freqinfo,
-        #                              tperseg, toverlap,
-        #                              basewidth=basewidth_triang)
-
-        # figure
-        fig, ax = plt.subplots(2, sharex=True)
-        ax[0].plot(data2[:, 0], data2[:, 1],
-                   y2_rec[:, 0], y2_rec[:, 1],)
-        #            data2_lag[:,0], data2_lag[:,1],
-        #            data2_rem[:,0], data2_rem[:,1],)
-        ax[0].set_ylabel('Optical flux')
-        ax[0].legend(['original', 'istcs', 'lag', 'rem'])
-        ax[1].plot(data1[:, 0], data1[:, 1],
-                   y1_rec[:, 0], y1_rec[:, 1],)
-        #          data1_lag[:,0], data1_lag[:,1],
-        #          data1_rem[:,0], data1_rem[:,1],)
-        ax[1].set_ylabel('X-ray flux')
-        ax[1].set_xlabel('Time')
-        fig.savefig('lc_ncf_noavesub.png')
-        if FIGSHOW:
-            plt.show()
-
-
-if __name__ == '__main__':
-    main()
