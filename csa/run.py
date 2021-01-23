@@ -99,12 +99,7 @@ def cs(data1, data2, freqinfo, lam):
     return freqs, x
 
 
-def _cv(data1, data2, freqinfo, lam, nfold=5, droprate=None):
-
-    # drop sample
-    if droprate:
-        data1 = _drop_sample(data1, droprate)
-        data2 = _drop_sample(data2, droprate)
+def _cv(data1, data2, freqinfo, lam, nfold=5):
 
     # freq vector
     freqs = _get_frecvec(freqinfo)
@@ -138,11 +133,18 @@ def cv(data1, data2, freqinfo, lambdainfo, nfold=5,
     # use window and subtract average
     data1_win = data1.copy()
     data2_win = data2.copy()
+
+    # drop some samples
+    if droprate:
+        data1_win = _drop_sample(data1, droprate)
+        data2_win = _drop_sample(data2, droprate)
+
+    # use window function
     t_minmax = _get_minmax(data1[:, 0], data2[:, 0])
     window = WindowGenerator(t_minmax)
     window.hann()
-    data1_win[:, 1] = _sub_ave(data1[:, 1]) * window.gene(data1[:, 0])
-    data2_win[:, 1] = _sub_ave(data2[:, 1]) * window.gene(data2[:, 0])
+    data1_win[:, 1] = _sub_ave(data1_win[:, 1]) * window.gene(data1_win[:, 0])
+    data2_win[:, 1] = _sub_ave(data2_win[:, 1]) * window.gene(data2_win[:, 0])
 
     # set lambda info
     lambdas = np.logspace(np.log10(lambdainfo[0]),
@@ -157,8 +159,7 @@ def cv(data1, data2, freqinfo, lambdainfo, nfold=5,
         futures = tqdm([executor.submit(_cv, lam=lam,
                                         data1=data1_win,
                                         data2=data2_win,
-                                        freqinfo=freqinfo,
-                                        droprate=droprate)
+                                        freqinfo=freqinfo)
                        for lam in lambdas],
                        disable=not set_verbose)  # tqdm option
         for k, future in enumerate(futures):
