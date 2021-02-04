@@ -343,41 +343,44 @@ def main():
             Y1_res, Y2_res, maxlags=10, fs=Fs)
 
         # figure
-        fig, ax = plt.subplots(4, figsize=(5, 9), sharex=True)
         plt.rcParams["font.size"] = 13
-        plt.rcParams['font.family'] ='Times New Roman'
+        plt.rcParams['font.family'] = 'Times New Roman'
         plt.rcParams["mathtext.fontset"] = "stix"
-        plt.rcParams['xtick.direction'] = 'in' # x axis in
-        plt.rcParams['ytick.direction'] = 'in' # y axis in 
+        plt.rcParams['xtick.direction'] = 'in'  # x axis in
+        plt.rcParams['ytick.direction'] = 'in'  # y axis in
+        fig, ax = plt.subplots(4, figsize=(5, 9), sharex=True)
 
         # observed (FIRFIR) and XPS + OPS
         lags, corr = ccf(zscore(data1[:, 1]), zscore(data2[:, 1]),
                          fs=Fs, maxlags=10)
-        ax[0].plot(lags, corr, color='grey')
+        ax[0].plot(lags, corr, color='k')
         ax[0].text(0.97, 0.95, '(a)', ha='right', va='top', fontsize=17,
                    transform=ax[0].transAxes)
+        ax[0].axhline(0, color='grey', linewidth=0.5, zorder=-1)
+        ax[0].axvline(0, color='grey', linewidth=0.5, zorder=-1)
 
         # XPS and OPS
         ax[1].fill_between(lags, q_hig_xps, q_low_xps, alpha=.5)
         ax[1].fill_between(lags, q_hig_ops, q_low_ops, alpha=.5)
         ax[1].plot(lags, q_med_ops, lags, q_med_xps)
-        ax[1].axhline(0, color='grey', linewidth=0.5, zorder=2)
-        ax[1].axvline(0, color='grey', linewidth=0.5, zorder=2)
+        ax[1].axhline(0, color='grey', linewidth=0.5, zorder=-1)
+        ax[1].axvline(0, color='grey', linewidth=0.5, zorder=-1)
         ax[1].text(0.97, 0.95, '(b)', ha='right', va='top', fontsize=17,
-                  transform=ax[1].transAxes)
+                   transform=ax[1].transAxes)
 
         # XOPS
         ax[2].plot(lags, q_med_xops, color='r')
-        ax[2].fill_between(lags, q_hig_xops, q_low_xops, alpha=.5, color='r')
-        ax[2].axhline(0, color='grey', linewidth=0.5, zorder=2)
-        ax[2].axvline(0, color='grey', linewidth=0.5, zorder=2)
+        ax[2].fill_between(lags, q_hig_xops, q_low_xops,
+                           alpha=.5, color='tab:red')
+        ax[2].axhline(0, color='grey', linewidth=0.5, zorder=-1)
+        ax[2].axvline(0, color='grey', linewidth=0.5, zorder=-1)
         ax[2].text(0.97, 0.95, '(c)', ha='right', va='top', fontsize=17,
                    transform=ax[2].transAxes)
 
         # residual
-        ax[3].plot(lags, q_med_res, color='cyan')
-        ax[3].axhline(0, color='grey', linewidth=0.5, zorder=2)
-        ax[3].axvline(0, color='grey', linewidth=0.5, zorder=2)
+        ax[3].plot(lags, q_med_res, color='tab:cyan')
+        ax[3].axhline(0, color='grey', linewidth=0.5, zorder=-1)
+        ax[3].axvline(0, color='grey', linewidth=0.5, zorder=-1)
         ax[3].text(0.97, 0.95, '(d)', ha='right', va='top', fontsize=17,
                    transform=ax[3].transAxes)
 
@@ -390,12 +393,11 @@ def main():
                  ha='center', va='center', rotation='vertical')
         # plt.ylabel('Correlation coefficient')
         plt.xlabel('Lag (s)')
-        plt.subplots_adjust(left=0.13, right=0.95, bottom=0.08,
+        plt.subplots_adjust(left=0.13, right=0.95, bottom=0.05,
                             top=0.98, hspace=0)
 
         # arrange and show
-        # plt.tight_layout()
-        plt.savefig('fig/ccf.png')
+        plt.savefig('fig/ccf_compare.png', dpi=300)
         # plt.show()
 
 
