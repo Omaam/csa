@@ -35,28 +35,28 @@ def main():
     fig, ax = plt.subplots(2, 2, figsize=(8, 5))
 
     # corr [-1, 1]
-    ax[0, 0].pcolormesh(time, bin_edges_corr_1, lagmap_corr_1, cmap='jet')
-    ax[0, 0].set_ylabel(r'$\tau$')
-    xmin, xmax = ax[0, 0].set_xlim()
-    ax[0, 0].hlines(0, xmin, xmax, linewidth=.8, color='grey')
+    ax[0, 1].pcolormesh(time, bin_edges_corr_1, lagmap_corr_1, cmap='jet')
+    ax[0, 1].set_ylabel(r'$\tau$')
+    # xmin, xmax = ax[0, 1].set_xlim()
+    ax[0, 1].axhline(0, linewidth=.8, color='grey')
 
     # anti [-1, 1]
-    ax[1, 0].pcolormesh(time, bin_edges_anti_1, lagmap_anti_1, cmap='jet')
-    ax[1, 0].set_xlabel('time')
-    ax[1, 0].set_ylabel(r'$\tau^{\rm anti}$')
-    xmin, xmax = ax[1, 0].set_xlim()
-    ax[1, 0].hlines(0, xmin, xmax, linewidth=.8, color='grey')
+    ax[1, 1].pcolormesh(time, bin_edges_anti_1, lagmap_anti_1, cmap='jet')
+    ax[1, 1].set_xlabel('time')
+    ax[1, 1].set_ylabel(r'$\tau^{\rm anti}$')
+    # xmin, xmax = ax[1, 1].set_xlim()
+    ax[1, 1].axhline(0, linewidth=.8, color='grey')
     
     # corr [-5, 5]
-    ax[0, 1].pcolormesh(time, bin_edges_corr_5, lagmap_corr_5, cmap='jet')
-    xmin, xmax = ax[0, 1].set_xlim()
-    ax[0, 1].hlines(0, xmin, xmax, linewidth=.8, color='grey')
+    ax[0, 0].pcolormesh(time, bin_edges_corr_5, lagmap_corr_5, cmap='jet')
+    # xmin, xmax = ax[0, 1].set_xlim()
+    ax[0, 0].axhline(0, linewidth=.8, color='grey')
 
     # anti [-5, 5]
-    heatmap = ax[1, 1].pcolormesh(time, bin_edges_anti_5, lagmap_anti_5,
+    heatmap = ax[1, 0].pcolormesh(time, bin_edges_anti_5, lagmap_anti_5,
                                   cmap='jet')
-    xmin, xmax = ax[1, 1].set_xlim()
-    ax[1, 1].hlines(0, xmin, xmax, linewidth=.8, color='grey')
+    # xmin, xmax = ax[1, 0].set_xlim()
+    ax[1, 0].axhline(0, linewidth=.8, color='grey')
 
     # colorbar
     fig.subplots_adjust(right=0.8)
