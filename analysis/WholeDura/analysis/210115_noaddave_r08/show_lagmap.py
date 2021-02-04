@@ -36,33 +36,29 @@ def main():
 
     # corr [-1, 1]
     ax[0, 1].pcolormesh(time, bin_edges_corr_1, lagmap_corr_1, cmap='jet')
-    ax[0, 1].set_ylabel(r'$\tau$')
-    # xmin, xmax = ax[0, 1].set_xlim()
     ax[0, 1].axhline(0, linewidth=.8, color='grey')
 
     # anti [-1, 1]
     ax[1, 1].pcolormesh(time, bin_edges_anti_1, lagmap_anti_1, cmap='jet')
     ax[1, 1].set_xlabel('time')
-    ax[1, 1].set_ylabel(r'$\tau^{\rm anti}$')
-    # xmin, xmax = ax[1, 1].set_xlim()
     ax[1, 1].axhline(0, linewidth=.8, color='grey')
     
     # corr [-5, 5]
     ax[0, 0].pcolormesh(time, bin_edges_corr_5, lagmap_corr_5, cmap='jet')
-    # xmin, xmax = ax[0, 1].set_xlim()
     ax[0, 0].axhline(0, linewidth=.8, color='grey')
+    ax[0, 0].set_ylabel(r'$\tau$')
 
     # anti [-5, 5]
     heatmap = ax[1, 0].pcolormesh(time, bin_edges_anti_5, lagmap_anti_5,
                                   cmap='jet')
-    # xmin, xmax = ax[1, 0].set_xlim()
     ax[1, 0].axhline(0, linewidth=.8, color='grey')
+    ax[1, 0].set_ylabel(r'$\tau^{\rm anti}$')
 
     # colorbar
     fig.subplots_adjust(right=0.8)
     cbar_ax = fig.add_axes([0.88, 0.09, 0.035, 0.86])
     cb = fig.colorbar(heatmap, cax=cbar_ax, extend='both',
-                      label=r'$\log({\rm amplitude})$')
+                      label=r'${\rm amplitude}$')
     plt.subplots_adjust(wspace=0.17)
 
     # plt.tight_layout()

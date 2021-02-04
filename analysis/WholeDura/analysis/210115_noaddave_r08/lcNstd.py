@@ -81,6 +81,6 @@ if __name__ == '__main__':
     # ax[1,1].set_xticklabels([])
     # ax[1,0].set_xticklabels([])
 
-    plt.subplots_adjust(left=0.09, right=0.97, bottom=0.09, top=0.95)
-    plt.savefig('fig/lcNstd.png', transparent=True)
+    plt.subplots_adjust(left=0.08, right=0.97, bottom=0.09, top=0.95)
+    plt.savefig('fig/lcNstd.png', transparent=True, dpi=300)
     plt.show()
