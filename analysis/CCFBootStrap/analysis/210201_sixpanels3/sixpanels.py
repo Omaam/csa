@@ -1,6 +1,5 @@
 import os
 import re
-import platform
 import glob
 
 import numpy as np
@@ -79,7 +78,6 @@ def main():
         Y2_xps = _collect_flux(files_data2)
         y1_low_xps, y1_med_xps, y1_hig_xps = lcbootstrap(Y1_xps, DROPRATE)
         y2_low_xps, y2_med_xps, y2_hig_xps = lcbootstrap(Y2_xps, DROPRATE)
-        time = np.loadtxt(files_data1[0])[:, 0]
 
         # OPS: get lightcurves, collect flux, and get quantile
         files_data1 = sorted(glob.glob(f'{d}/XY/data1_ops_*.dat'))
@@ -91,7 +89,8 @@ def main():
 
         # get time range
         trange_ana = [int(s) for s in re.split('[a-z]+', d)[1:]]
-        trange = [np.mean(trange_ana)-10, np.mean(trange_ana)+20]
+        trange = [np.mean(trange_ana)-5, np.mean(trange_ana)+5]
+        # trange = [np.mean(trange_ana)-10, np.mean(trange_ana)+20]
         print('trange: {}'.format(trange))
 
         # query
@@ -99,46 +98,60 @@ def main():
         # files_data2 = sorted(glob.glob(f'{d}/XY/data2_???.dat'))
         data1_rec = np.loadtxt(files_data1[0])
         data2_rec = np.loadtxt(files_data2[0])
-        i_q = np.where((trange[0] <= data1[:, 0]) & (data1[:, 0] < trange[1]))[0]
-        i_q_rec = np.where((trange[0] <= data1_rec[:, 0]) & \
+        i_q = np.where((trange[0] <= data1[:, 0]) &
+                       (data1[:, 0] < trange[1]))[0]
+        i_q_rec = np.where((trange[0] <= data1_rec[:, 0]) &
                            (data1_rec[:, 0] < trange[1]))[0]
 
         # figure
-        plt.rcParams["font.size"] = 10
-        plt.rcParams['font.family'] ='Times New Roman'
+        plt.rcParams["font.size"] = 20
+        plt.rcParams['font.family'] = 'Times New Roman'
         plt.rcParams["mathtext.fontset"] = "stix"
-        plt.rcParams['xtick.direction'] = 'in' # x axis in
-        plt.rcParams['ytick.direction'] = 'in' # y axis in 
-        fig, ax = plt.subplots(2, figsize=(7, 5), sharex=True)
+        plt.rcParams['xtick.direction'] = 'in'  # x axis in
+        plt.rcParams['ytick.direction'] = 'in'  # y axis in
+        fig, ax = plt.subplots(2, figsize=(10, 5), sharex=True)
+        plt.subplots_adjust(hspace=0)
 
-        # observed (FIRFIR) and XPS + OPS
+        # Optical
         ax[0].plot(data2[i_q, 0], data2[i_q, 1], color='grey', alpha=.5)
-        ax[0].plot(data2_rec[i_q_rec, 0], y2_med_xps[i_q_rec], color='tab:orange')
-        ax[0].plot(data2_rec[i_q_rec, 0], y2_med_ops[i_q_rec], color='tab:blue')
+        ax[0].plot(data2_rec[i_q_rec, 0], y2_med_xps[i_q_rec],
+                   color='tab:orange')
+        ax[0].plot(data2_rec[i_q_rec, 0], y2_med_ops[i_q_rec],
+                   color='tab:blue')
         ax[0].fill_between(data2_rec[i_q_rec, 0], y2_low_xps[i_q_rec],
                            y2_hig_xps[i_q_rec], color='tab:orange', alpha=.5)
         ax[0].fill_between(data2_rec[i_q_rec, 0], y2_low_ops[i_q_rec],
                            y2_hig_ops[i_q_rec], color='tab:blue', alpha=.5)
-        ax[0].set_ylabel('flux')
-        ax[0].text(0.97, 0.95, 'Optical', ha='right', va='top', fontsize=17,
+        ax[0].text(0.97, 0.95, 'Optical', ha='right', va='top', fontsize=20,
                    transform=ax[0].transAxes)
 
+        # X-ray
         ax[1].plot(data1[i_q, 0], data1[i_q, 1], color='grey', alpha=.5)
-        ax[1].plot(data1_rec[i_q_rec, 0], y1_med_xps[i_q_rec], color='tab:orange')
-        ax[1].plot(data1_rec[i_q_rec, 0], y1_med_ops[i_q_rec], color='tab:blue')
+        ax[1].plot(data1_rec[i_q_rec, 0], y1_med_xps[i_q_rec],
+                   color='tab:orange')
+        ax[1].plot(data1_rec[i_q_rec, 0], y1_med_ops[i_q_rec],
+                   color='tab:blue')
         ax[1].fill_between(data1_rec[i_q_rec, 0], y1_low_xps[i_q_rec],
                            y1_hig_xps[i_q_rec], color='tab:orange', alpha=.5)
         ax[1].fill_between(data1_rec[i_q_rec, 0], y1_low_ops[i_q_rec],
                            y1_hig_ops[i_q_rec], color='tab:blue', alpha=.5)
-        ax[1].legend(['original (filterd)', 'XPS', 'OPS'], loc='best')
-        ax[1].set_ylabel('flux')
-        ax[1].set_xlabel('time')
-        ax[1].text(0.97, 0.95, 'X-ray', ha='right', va='top', fontsize=17,
+        ax[1].text(0.97, 0.95, 'X-ray', ha='right', va='top', fontsize=20,
                    transform=ax[1].transAxes)
 
-        plt.tight_layout()
-        os.makedirs('fig', exist_ok=True)
-        plt.savefig(f'fig/reclc_{d}.png')
+        # add a big axis, hide frame
+        fig.add_subplot(111, frameon=False)
+        plt.tick_params(labelcolor='none', top=False, bottom=False,
+                        left=False, right=False)
+        plt.ylabel('Standardized count rate')
+        plt.xlabel(r'$t$ (s)')
+        plt.subplots_adjust(left=0.08, right=0.98, bottom=0.13, top=0.95)
+
+        # arrange
+        # plt.tight_layout()
+        dura = 30 if np.diff(trange) == 30 else 10
+        print(dura)
+        os.makedirs(f'fig/dura{dura}', exist_ok=True)
+        plt.savefig(f'fig/dura{dura}/reclc_{d}.png', dpi=300)
         # plt.show()
 
 
