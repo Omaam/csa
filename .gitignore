@@ -129,6 +129,7 @@ dmypy.json
 .pyre/
 
 # My ignore
+*.DS_Store
 **/XY
 **/cv
 **/X.dat
