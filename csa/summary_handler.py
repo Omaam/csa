@@ -371,7 +371,7 @@ class Summary:
         ci_list: (lag, ci_value)
         ci_label: ci name e.g. 'ci 95%'
         '''
-        fig = plt.figure(figsize=(8, 2*2+2))
+        fig = plt.figure(figsize=(8, 2*2+3))
         height = 0.8/2
 
         # periodic sum
@@ -402,9 +402,9 @@ class Summary:
             ax0.plot(ci_list[0], ci_list[1], label=ci_label,
                      color='r', alpha=0.7)
         ax0.set_ylabel('Density')
-        ax0.set_xlabel(r'$\tau$')
+        ax0.set_xlabel(r'$\tau$ (s)')
         # ax0.set_xlabel('Lag')
-        ax0.legend(loc='best')
+        # ax0.legend(loc='best')
 
         # color babble plot
         ax1 = fig.add_axes([0.10, 0.1+1*height-0.2, 0.85, height+0.2],

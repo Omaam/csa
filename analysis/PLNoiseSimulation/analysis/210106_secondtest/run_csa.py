@@ -4,13 +4,20 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 
-from csa.csa import cs, cv, stcs
+from csa.run import cs, cv, stcs
 from csa.summary_handler import SummaryNew, read_summary, make_summary
 from csa.cvresult import show_cvdata
 
 CV = 1
 
 def main():
+
+    # for paper
+    plt.rcParams["font.size"] = 20
+    plt.rcParams['font.family'] = 'Times New Roman'
+    plt.rcParams["mathtext.fontset"] = "stix"
+    plt.rcParams['xtick.direction'] = 'in'  # x axis in
+    plt.rcParams['ytick.direction'] = 'in'  # y axis in
 
     # variable setting
     infile1 = '../../simdata/xdata.dat'

@@ -1,5 +1,4 @@
 import os
-import time
 
 import numpy as np
 import pandas as pd
@@ -7,16 +6,14 @@ import matplotlib.pyplot as plt
 from scipy.stats import zscore
 
 from csa.run import cs, cv
-from csa.summary_handler import SummaryNew, read_summary, make_summary
+from csa.summary_handler import SummaryNew
 import csa.xhandler as xhan
 from csa.cvresult import show_cvdata, lambda_fromcvdata
 from fir_filter import fir
 
 
-
-
 def extract_lc(lcdata, trange):
-    time = lcdata[:,0]
+    time = lcdata[:, 0]
     cond = (trange[0] <= time) & (time <= trange[1])
     lcdata_ext = lcdata[cond, :]
     return lcdata_ext
@@ -51,11 +48,11 @@ def preprocess_for_gx339(path_to_data, ndata=25000):
 def main():
 
     # for paper
-    plt.rcParams["font.size"] = 13
+    plt.rcParams["font.size"] = 20
     plt.rcParams['font.family'] = 'Times New Roman'
     plt.rcParams["mathtext.fontset"] = "stix"
     plt.rcParams['xtick.direction'] = 'in'  # x axis in
-    plt.rcParams['ytick.direction'] = 'in'  # y axis in 
+    plt.rcParams['ytick.direction'] = 'in'  # y axis in
 
     # cv switch
     CV = 0
