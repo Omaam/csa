@@ -12,12 +12,6 @@ from csa.summary_handler import SummaryNew
 from csa.deco import stopwatch
 
 
-# confirm the number of CPU
-ncpu = os.cpu_count()
-MAX_WORKERS = ncpu
-print(f'number of cpu: {ncpu}')
-
-
 __all__ = ['cs', 'cv', 'stcs', 'istcs']
 
 
@@ -187,8 +181,8 @@ def _stcs(data1, data2, segrange, freqinfo, lam, droprate=None):
 
 @stopwatch
 def stcs(data1, data2, freqinfo, lam, tperseg, toverlap,
-         window='hann', x_name='X.dat', droprate=None,
-         max_workers=None, set_verbose=True):
+         window='hann', droprate=None, max_workers=None,
+         set_verbose=True):
 
     # calucurate segranges
     t_min, t_max = _get_minmax(data1[:, 0], data2[:, 0])
@@ -209,7 +203,7 @@ def stcs(data1, data2, freqinfo, lam, tperseg, toverlap,
     # output
     t = np.mean(segranges, axis=1)
     freq = _get_frecvec(freqinfo)
-    np.savetxt(x_name, X)
+    # np.savetxt('X.dat, X)
     return freq, t, X
 
 

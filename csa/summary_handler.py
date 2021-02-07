@@ -9,8 +9,8 @@ from matplotlib.colors import Normalize
 # from mpl_toolkits.axes_grid1.colorbar import colorbar
 from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
 import scipy.stats as stats
-import seaborn as sns; sns.set()
-sns.set_style("whitegrid")
+# import seaborn as sns; sns.set()
+# sns.set_style("whitegrid")
 
 from csa.signiftest import LagSignifTest
 
@@ -348,7 +348,7 @@ class Summary:
                         self.freq_info[1]))
         ax.set_yscale('log')
         ax.set_ylim(np.min(self.df_sum.norm12))
-        ax.set_ylabel('Power')
+        ax.set_ylabel('Amplitude')
         ax.set_xlabel('Lag')
         if lagrange:
             ax.set_xlim(lagrange)
@@ -397,12 +397,13 @@ class Summary:
         ax0.bar(bins_center, hist_value,  color="r", width=lagbinwidth,
                 align="center", alpha=0.5, edgecolor="k", label="Number")
         ax0.bar(bins_center, phist_value, color="b", width=lagbinwidth,
-                align="center", alpha=0.5, edgecolor="k", label="Power")
+                align="center", alpha=0.5, edgecolor="k", label="Amplitude")
         if ci_list:
             ax0.plot(ci_list[0], ci_list[1], label=ci_label,
                      color='r', alpha=0.7)
         ax0.set_ylabel('Density')
-        ax0.set_xlabel('Lag')
+        ax0.set_xlabel(r'$\tau$')
+        # ax0.set_xlabel('Lag')
         ax0.legend(loc='best')
 
         # color babble plot

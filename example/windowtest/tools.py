@@ -185,6 +185,7 @@ def main():
     j = np.random.randint(0, lagmap.shape[-1])
     print(f'index: {j}')
     plot_omplot(X[:,j], freqinfo, lagrange=[-10, 10], bins='auto')
+    plt.savefig('omplot_noavesub.png')
     plt.show()
 
 

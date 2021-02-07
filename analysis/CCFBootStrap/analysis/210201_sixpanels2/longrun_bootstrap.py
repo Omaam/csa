@@ -45,7 +45,7 @@ def get_ncore():
     if 'Ubuntu' in platform.platform():
         core = 4
     elif 'centos' in platform.platform():
-        core = 40
+        core = 20
     elif 'macOS' in platform.platform():
         core = 8
     else:
@@ -164,10 +164,10 @@ def run_bootstrap(data1, data2):
     _init_analysis(cv=0, stcs=0, istcs=0)
 
     # analysis switch
-    CV = 1
-    STCS = 1
-    ISTCS = 1
-    CCF = 0
+    CV = 0
+    STCS = 0
+    ISTCS = 0
+    CCF = 1
 
     # analytical info
     LAMBDAINFO = [1e-2, 1e4, 20]
@@ -243,7 +243,6 @@ def run_bootstrap(data1, data2):
             data1_rec, data2_rec = istcs(X, data1, data2, FREQINFO,
                                          TPERSEG, TOVERLAP,
                                          max_workers=CORE,
-                                         add_ave=True,
                                          set_verbose=SETBERBOSE,
                                          basewidth=BASEWIDTH_TRIANG)
             fname_data1 = 'data1_{}.dat'.format(str(i).rjust(3, '0'))
@@ -255,7 +254,6 @@ def run_bootstrap(data1, data2):
             data1_xps, data2_xps = istcs(X_xps, data1, data2, FREQINFO,
                                          TPERSEG, TOVERLAP,
                                          max_workers=CORE,
-                                         add_ave=True,
                                          set_verbose=SETBERBOSE,
                                          basewidth=BASEWIDTH_TRIANG)
             fname_data1_xps = 'data1_xps_{}.dat'.format(str(i).rjust(3, '0'))
@@ -267,7 +265,6 @@ def run_bootstrap(data1, data2):
             data1_ops, data2_ops = istcs(X_ops, data1, data2, FREQINFO,
                                          TPERSEG, TOVERLAP,
                                          max_workers=CORE,
-                                         add_ave=True,
                                          set_verbose=SETBERBOSE,
                                          basewidth=BASEWIDTH_TRIANG)
             fname_data1_ops = 'data1_ops_{}.dat'.format(str(i).rjust(3, '0'))
@@ -279,7 +276,6 @@ def run_bootstrap(data1, data2):
             data1_xops, data2_xops = istcs(X_xops, data1, data2, FREQINFO,
                                            TPERSEG, TOVERLAP,
                                            max_workers=CORE,
-                                           add_ave=True,
                                            set_verbose=SETBERBOSE,
                                            basewidth=BASEWIDTH_TRIANG)
             fname_data1_xops = 'data1_xops_{}.dat'.format(str(i).rjust(3, '0'))
@@ -358,21 +354,20 @@ def run_bootstrap(data1, data2):
 @send_email(True)
 def main():
 
+
     # preprocess
     data1, data2 = preprocess_for_gx339(
         '../../data/gx339_night1_2.txt', ndata=24000)
 
     # divide
-    istart = np.arange(0, 23000, 1000)
-    iend = istart + 2000
-    data1_seg = np.array([data1[istart[i]:iend[i], :] \
-                       for i in range(len(istart))])
-    data2_seg = np.array([data2[istart[i]:iend[i], :] \
-                       for i in range(len(istart))])
+    data1_seg = np.reshape(data1, (int(len(data1)/2000), 2000, 2))
+    data2_seg = np.reshape(data2, (int(len(data2)/2000), 2000, 2))
+    logger.debug('data1_seg: {}'.format(data1_seg.shape))
+    logger.debug('data2_seg: {}'.format(data2_seg.shape))
 
     # choice segment to analyze from 1 to n_segment - 1
     np.random.seed(20210123)
-    id_cho = np.random.choice(23, 12, replace=False)[6:]
+    id_cho= np.random.choice(10, 6, replace=False) + 1
     logger.debug('id_cho: {}'.format(id_cho))
 
     # extract data

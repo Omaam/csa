@@ -1,4 +1,4 @@
-import os
+
 import re
 import platform
 import glob
@@ -31,8 +31,7 @@ sh.setFormatter(formatter)
 logger.addHandler(sh)
 
 # logger for FileHandler
-os.makedirs('log', exist_ok=True)
-fh = logging.FileHandler(f'log/{__file__}.log')
+fh = logging.FileHandler(f'{__file__}.log')
 fh.setLevel(logging.DEBUG)
 fh.setFormatter(formatter)
 logger.addHandler(fh)
@@ -40,22 +39,12 @@ logger.addHandler(fh)
 logger.setLevel(logging.DEBUG)
 
 
-def get_ncore():
-    print(platform.platform())
-    if 'Ubuntu' in platform.platform():
-        core = 4
-    elif 'centos' in platform.platform():
-        core = 40
-    elif 'macOS' in platform.platform():
-        core = 8
-    else:
-        core = None
-    print(f'OS is {platform.system()}',
-          f' -> the number of used core is {core}')
-    return core
-
-# set core
-CORE = get_ncore()
+# core check
+if platform.system() == 'Darwin':
+    CORE = 8
+elif platform.system() == 'Linux':
+    CORE = 30
+print(f'OS is {platform.system()} -> the number of used core is {CORE}')
 
 
 def load_data(fname):
@@ -132,7 +121,6 @@ def _init_analysis(cv=False, stcs=False, istcs=False):
 
 
 def preprocess_for_gx339(path_to_data, ndata=2000):
-
     # read file
     df_ori = load_data(path_to_data)
     df_ori = df_ori.iloc[:ndata]
@@ -158,15 +146,16 @@ def preprocess_for_gx339(path_to_data, ndata=2000):
     return data1, data2
 
 
-def run_bootstrap(data1, data2):
+@send_email(True)
+def main():
 
     # initialize analysis
-    _init_analysis(cv=0, stcs=0, istcs=0)
+    _init_analysis(cv=1, stcs=0, istcs=0)
 
     # analysis switch
     CV = 1
-    STCS = 1
-    ISTCS = 1
+    STCS = 0
+    ISTCS = 0
     CCF = 0
 
     # analytical info
@@ -176,9 +165,13 @@ def run_bootstrap(data1, data2):
     TOVERLAP = 49  # seconds
     BASEWIDTH_TRIANG = 2*(TPERSEG - TOVERLAP)
     Fs = 20  # samples / second
-    DROPRATE = 0.5
+    DROPRATE = 0.1
     NBOOT = 50
     SETBERBOSE = False
+
+    # preprocess
+    data1, data2 = preprocess_for_gx339(
+        '../../data/gx339_night1_2.txt', ndata=2000)
 
     # main analysis
     if CV:
@@ -243,7 +236,6 @@ def run_bootstrap(data1, data2):
             data1_rec, data2_rec = istcs(X, data1, data2, FREQINFO,
                                          TPERSEG, TOVERLAP,
                                          max_workers=CORE,
-                                         add_ave=True,
                                          set_verbose=SETBERBOSE,
                                          basewidth=BASEWIDTH_TRIANG)
             fname_data1 = 'data1_{}.dat'.format(str(i).rjust(3, '0'))
@@ -255,7 +247,6 @@ def run_bootstrap(data1, data2):
             data1_xps, data2_xps = istcs(X_xps, data1, data2, FREQINFO,
                                          TPERSEG, TOVERLAP,
                                          max_workers=CORE,
-                                         add_ave=True,
                                          set_verbose=SETBERBOSE,
                                          basewidth=BASEWIDTH_TRIANG)
             fname_data1_xps = 'data1_xps_{}.dat'.format(str(i).rjust(3, '0'))
@@ -267,7 +258,6 @@ def run_bootstrap(data1, data2):
             data1_ops, data2_ops = istcs(X_ops, data1, data2, FREQINFO,
                                          TPERSEG, TOVERLAP,
                                          max_workers=CORE,
-                                         add_ave=True,
                                          set_verbose=SETBERBOSE,
                                          basewidth=BASEWIDTH_TRIANG)
             fname_data1_ops = 'data1_ops_{}.dat'.format(str(i).rjust(3, '0'))
@@ -279,7 +269,6 @@ def run_bootstrap(data1, data2):
             data1_xops, data2_xops = istcs(X_xops, data1, data2, FREQINFO,
                                            TPERSEG, TOVERLAP,
                                            max_workers=CORE,
-                                           add_ave=True,
                                            set_verbose=SETBERBOSE,
                                            basewidth=BASEWIDTH_TRIANG)
             fname_data1_xops = 'data1_xops_{}.dat'.format(str(i).rjust(3, '0'))
@@ -348,59 +337,9 @@ def run_bootstrap(data1, data2):
         ax[1].set_xlabel('lag')
         ax[1].set_ylabel('r')
 
-        # figure arrange and save
         plt.tight_layout()
-        os.makedirs('fig', exist_ok=True)
         plt.savefig('fig/ccf.png')
         # plt.show()
-
-
-@send_email(True)
-def main():
-
-    # preprocess
-    data1, data2 = preprocess_for_gx339(
-        '../../data/gx339_night1_2.txt', ndata=24000)
-
-    # divide
-    istart = np.arange(0, 23000, 1000)
-    iend = istart + 2000
-    data1_seg = np.array([data1[istart[i]:iend[i], :] \
-                       for i in range(len(istart))])
-    data2_seg = np.array([data2[istart[i]:iend[i], :] \
-                       for i in range(len(istart))])
-
-    # choice segment to analyze from 1 to n_segment - 1
-    np.random.seed(20210123)
-    id_cho = np.random.choice(23, 12, replace=False)[6:]
-    logger.debug('id_cho: {}'.format(id_cho))
-
-    # extract data
-    data1_cho = data1_seg[id_cho]
-    data2_cho = data2_seg[id_cho]
-    logger.debug('data1_cho: {}'.format(data1_cho.shape))
-    logger.debug('data2_cho: {}'.format(data2_cho.shape))
-
-    # start analysis for chosen data
-    for d1, d2 in zip(data1_cho, data2_cho):
-
-        # logger
-        logger.debug('d1: {}'.format(d1.shape))
-        logger.debug('d2: {}'.format(d2.shape))
-
-        # make directory and move
-        assert all(d1[:, 0] == d2[:, 0]), 'TimeError'
-        name_dir = 'from{}to{}'.format(int(round(d1[0, 0])),
-                                       int(round(d1[-1, 0])))
-        if os.path.exists(name_dir) is False:
-            os.mkdir(name_dir)
-        os.chdir(name_dir)
-
-        # run analysis
-        run_bootstrap(d1, d2)
-
-        # back directory
-        os.chdir('..')
 
 
 if __name__ == '__main__':
