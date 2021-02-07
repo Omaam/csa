@@ -149,7 +149,6 @@ def main():
         # arrange
         # plt.tight_layout()
         dura = 30 if np.diff(trange) == 30 else 10
-        print(dura)
         os.makedirs(f'fig/dura{dura}', exist_ok=True)
         plt.savefig(f'fig/dura{dura}/reclc_{d}.png', dpi=300)
         # plt.show()
