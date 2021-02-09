@@ -1,11 +1,15 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import seaborn as sns
 from scipy import signal as sig
 from scipy.stats import zscore
 from scipy import fftpack
 
 from csa.bootstrap import ccf
+
+
+sns.set(style='whitegrid')
 
 
 def add_bigaxis(fig, xlabel=None, ylabel=None,
@@ -85,11 +89,11 @@ def main():
 
     plt.subplot2grid((2, 4), (1, 0), rowspan=1)
     plt.plot(t, h_x, t, h_x_filt)
-    plt.xlabel('time')
+    plt.xlabel('time (s)')
 
     plt.subplot2grid((2, 4), (1, 1), rowspan=1)
     plt.plot(t[start:end], h_x[start:end], t[start:end], h_x_filt[start:end])
-    plt.xlabel('time')
+    plt.xlabel('time (s)')
 
     plt.subplot2grid((2, 4), (0, 2), rowspan=1)
     freqs, pows = psd(H_x_filt, 20)
@@ -101,7 +105,7 @@ def main():
     plt.subplot2grid((2, 4), (1, 2), rowspan=1)
     freqs, pows = psd(H_o_filt, 20)
     plt.plot(freqs, pows)
-    plt.xlabel('freq')
+    plt.xlabel('frequency (Hz)')
     plt.yscale('log')
     plt.xscale('log')
 
@@ -110,13 +114,13 @@ def main():
     lag, corr = ccf(h_x_filt, h_o_filt, 0.05)
     plt.plot(lag, corr)
     plt.title('CCF')
-    plt.xlabel('lag')
-    plt.ylabel('correlation')
+    plt.xlabel('lag (s)')
+    plt.ylabel('Correlation coefficient')
 
     # setting
     fig = add_bigaxis(fig, ylabel='flux')
     plt.tight_layout()
-    plt.savefig('lc_with_ccf.png')
+    plt.savefig('fig/lc_with_ccf.png')
     # plt.show()
     plt.close()
 
@@ -124,11 +128,11 @@ def main():
     fig, ax = plt.subplots()
     lag, corr = ccf(h_x_filt, h_o_filt, maxlags=10, fs=20)
     plt.plot(lag, corr)
-    plt.title('CCF')
-    plt.xlabel('lag')
-    plt.ylabel('correlation')
+    # plt.title('CCF')
+    plt.xlabel('Lag (s)')
+    plt.ylabel('Correlation coefficient')
     plt.tight_layout()
-    plt.savefig('ccf.png')
+    plt.savefig('fig/ccf.png')
     plt.show()
 
     # fig, ax = plt.subplots(2, 3, figsize=(10,7))
