@@ -70,7 +70,7 @@ def main():
 
     for d in dirs:
         print(f'{d}/XY/data1_???.dat')
-        
+
         # XPS: get lightcurves, collect flux, and get quantile
         files_data1 = sorted(glob.glob(f'{d}/XY/data1_xps_*.dat'))
         files_data2 = sorted(glob.glob(f'{d}/XY/data2_xps_*.dat'))
@@ -112,16 +112,20 @@ def main():
         fig, ax = plt.subplots(2, figsize=(10, 5), sharex=True)
         plt.subplots_adjust(hspace=0)
 
+        # amplify OPS
+        rate_ops = 1.5
+
         # Optical
         ax[0].plot(data2[i_q, 0], data2[i_q, 1], color='grey', alpha=.5)
         ax[0].plot(data2_rec[i_q_rec, 0], y2_med_xps[i_q_rec],
                    color='tab:orange')
-        ax[0].plot(data2_rec[i_q_rec, 0], y2_med_ops[i_q_rec],
+        ax[0].plot(data2_rec[i_q_rec, 0], y2_med_ops[i_q_rec]*rate_ops,
                    color='tab:blue')
         ax[0].fill_between(data2_rec[i_q_rec, 0], y2_low_xps[i_q_rec],
                            y2_hig_xps[i_q_rec], color='tab:orange', alpha=.5)
-        ax[0].fill_between(data2_rec[i_q_rec, 0], y2_low_ops[i_q_rec],
-                           y2_hig_ops[i_q_rec], color='tab:blue', alpha=.5)
+        ax[0].fill_between(data2_rec[i_q_rec, 0], y2_low_ops[i_q_rec]*rate_ops,
+                           y2_hig_ops[i_q_rec]*rate_ops,
+                           color='tab:blue', alpha=.5)
         ax[0].text(0.97, 0.95, 'Optical', ha='right', va='top', fontsize=20,
                    transform=ax[0].transAxes)
 
@@ -129,12 +133,13 @@ def main():
         ax[1].plot(data1[i_q, 0], data1[i_q, 1], color='grey', alpha=.5)
         ax[1].plot(data1_rec[i_q_rec, 0], y1_med_xps[i_q_rec],
                    color='tab:orange')
-        ax[1].plot(data1_rec[i_q_rec, 0], y1_med_ops[i_q_rec],
+        ax[1].plot(data1_rec[i_q_rec, 0], y1_med_ops[i_q_rec]*rate_ops,
                    color='tab:blue')
         ax[1].fill_between(data1_rec[i_q_rec, 0], y1_low_xps[i_q_rec],
                            y1_hig_xps[i_q_rec], color='tab:orange', alpha=.5)
-        ax[1].fill_between(data1_rec[i_q_rec, 0], y1_low_ops[i_q_rec],
-                           y1_hig_ops[i_q_rec], color='tab:blue', alpha=.5)
+        ax[1].fill_between(data1_rec[i_q_rec, 0], y1_low_ops[i_q_rec]*rate_ops,
+                           y1_hig_ops[i_q_rec]*rate_ops,
+                           color='tab:blue', alpha=.5)
         ax[1].text(0.97, 0.95, 'X-ray', ha='right', va='top', fontsize=20,
                    transform=ax[1].transAxes)
 
