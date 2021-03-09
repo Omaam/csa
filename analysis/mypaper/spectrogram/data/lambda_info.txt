@@ -1,0 +1,2 @@
+# lambda_lo  lambda_up  nlambda
+0.1  10000.0  20

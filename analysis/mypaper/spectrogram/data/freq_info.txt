@@ -1,0 +1,2 @@
+# freq_lo  freq_up  nfreq
+0  10  2000
