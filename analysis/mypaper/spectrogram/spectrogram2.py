@@ -53,6 +53,6 @@ if __name__ == '__main__':
 
     # save
     print('save fig')
-    fig.savefig('spectrogram_FIR7Hz.png', transparent=True, dpi=300)
+    fig.savefig('spectrogram_FIR2Hz.png', transparent=True, dpi=300)
     # fig.savefig('spectrogram.pdf', transparent=True, dpi=100)
     plt.show()
