@@ -200,7 +200,8 @@ def main():
         # get freq for XPS
         M = []
         for x in X_xps.T:
-            masks = np.nan_to_num(x[:2000] / x[:2000])
+            # masks = np.nan_to_num(x[:2000] / x[:2000])
+            masks = np.sqrt(x[:2000]**2 + x[2000:4000] + x[4000:6000] + x[6000:8000])
             M.append(masks)
         M = np.array(M).T
         print(M.shape)
@@ -212,9 +213,21 @@ def main():
         time = np.arange(0, 1192, 1)
 
         # plot mask
-        plt.pcolormesh(time, freqs, M, cmap='binary')
+        im = plt.pcolormesh(time, freqs, np.log10(1+M))
         plt.xlabel(r'$t$ (s)')
         plt.ylabel('Frequency (Hz)')
+
+        # color bar
+        cbar = plt.colorbar(im)
+        cbar.set_label('log(Power)')
+
+        # save fig
+        # figure
+        plt.rcParams["font.size"] = 10
+        plt.rcParams['font.family'] = 'Times New Roman'
+        plt.rcParams["mathtext.fontset"] = "stix"
+        plt.rcParams['xtick.direction'] = 'in'  # x axis in
+        plt.rcParams['ytick.direction'] = 'in'  # y axis in
         plt.savefig('fig/spectrogram_xps.png', dpi=300)
         plt.show()
 
