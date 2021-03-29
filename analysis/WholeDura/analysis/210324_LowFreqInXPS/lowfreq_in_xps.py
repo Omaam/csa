@@ -214,7 +214,7 @@ def main():
 
         # plot mask
         im = plt.pcolormesh(time, freqs, np.log10(1+M))
-        plt.ylim(0, 3)
+        plt.ylim([0, 3])
         plt.xlabel(r'$t$ (s)')
         plt.ylabel('Frequency (Hz)')
 
