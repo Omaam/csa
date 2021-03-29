@@ -214,6 +214,7 @@ def main():
 
         # plot mask
         im = plt.pcolormesh(time, freqs, np.log10(1+M))
+        plt.ylim(0, 3)
         plt.xlabel(r'$t$ (s)')
         plt.ylabel('Frequency (Hz)')
 
@@ -229,7 +230,7 @@ def main():
         plt.rcParams['xtick.direction'] = 'in'  # x axis in
         plt.rcParams['ytick.direction'] = 'in'  # y axis in
         plt.savefig('fig/spectrogram_xps.png', dpi=300)
-        plt.show()
+        # plt.show()
 
 
 if __name__ == '__main__':
