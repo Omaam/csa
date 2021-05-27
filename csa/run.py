@@ -1,5 +1,5 @@
 from concurrent.futures import ProcessPoolExecutor
-import os
+# import os
 
 import numpy as np
 from sklearn.model_selection import KFold
@@ -201,7 +201,7 @@ def stcs(data1, data2, freqinfo, lam, tperseg, toverlap,
             X[:, i] = future.result()
 
     # output
-    t = np.mean(segranges, axis=1)
+    t = np.append(segranges[:, 0], segranges[-1, 0]+(tperseg-toverlap))
     freq = _get_frecvec(freqinfo)
     # np.savetxt('X.dat, X)
     return freq, t, X
